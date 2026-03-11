@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>族谱迁徙系统</title>
+    <!-- 提前设置错误处理逻辑，捕获地图API加载过程中的错误 -->
+    <script>
+      // 忽略高德地图的已知错误，特别是Worker postMessage错误
+      window.addEventListener('error', function(event) {
+        const msg = event.message || '';
+        if (msg.includes('Failed to execute \'postMessage\' on \'Worker\'') || 
+            msg.includes('DataCloneError') ||
+            msg.includes('USERKEY_PLAT_NOMATCH') ||
+            msg.includes('Unimplemented type: 3') ||
+            msg.includes('FlyDataAuthTask error') ||
+            msg.includes('wf is not a function')) {
+          console.warn('已忽略高德地图已知错误:', msg);
+          event.preventDefault(); // 阻止错误继续传播
+          return true;
+        }
+        return false;
+      });
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
