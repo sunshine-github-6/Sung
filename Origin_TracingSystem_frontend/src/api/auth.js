@@ -76,3 +76,30 @@ export function logout() {
   sessionStorage.removeItem('userInfo')
   window.location.href = '/login'
 }
+
+/**
+ * 申请密码重置
+ */
+export async function requestPasswordReset(username, reason = '') {
+  try {
+    const response = await apiClient.post('/api/password-reset/request', {
+      username,
+      reason
+    })
+    return response.data
+  } catch (error) {
+    throw new Error(error.response?.data?.message || '申请密码重置失败')
+  }
+}
+
+/**
+ * 查询密码重置申请状态
+ */
+export async function checkPasswordResetStatus(username) {
+  try {
+    const response = await apiClient.get(`/api/password-reset/status/${username}`)
+    return response.data.data
+  } catch (error) {
+    throw new Error(error.response?.data?.message || '查询密码重置状态失败')
+  }
+}

@@ -7,18 +7,19 @@ db = SQLAlchemy()
 
 class OriginTracingBranches(db.Model):
     """家族分支表"""
-    __tablename__ = 'Origin_Tracing_Branches'
+    __tablename__ = 'branches'
 
-    branch_id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='分支ID')
-    branch_name = db.Column(db.String(255), nullable=False, comment='分支名称')
-    surname = db.Column(db.String(50), comment='姓氏')
-    ancestral_home = db.Column(db.String(255), comment='祖源地')
-    first_ancestor = db.Column(db.String(255), comment='得姓始祖或开基祖')
-    historical_summary = db.Column(db.Text, comment='历史摘要')
-    source_reference = db.Column(db.String(500), comment='资料来源')
-    created_at = db.Column(db.DateTime, default=datetime.now, comment='记录创建时间')
+    branch_id = db.Column('id', db.Integer, primary_key=True, autoincrement=True)
+    branch_name = db.Column('name', db.String(255), nullable=False)
+    surname = db.Column(db.String(50), default='姜')
+    ancestral_home = db.Column(db.String(255))
+    first_ancestor = db.Column(db.String(255))
+    historical_summary = db.Column(db.Text)
+    source_reference = db.Column(db.String(500))
+    celebrity_info = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
-    # 关系定义
     migrations = db.relationship('OriginTracingMigrations', backref='branch', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
@@ -27,21 +28,22 @@ class OriginTracingBranches(db.Model):
 
 class OriginTracingLocations(db.Model):
     """地理地点表"""
-    __tablename__ = 'Origin_Tracing_Locations'
+    __tablename__ = 'locations'
 
-    location_id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='地点ID')
-    historical_name = db.Column(db.String(255), nullable=False, comment='历史地名')
-    modern_name = db.Column(db.String(255), comment='现代地名')
-    longitude = db.Column(db.Numeric(11, 8), comment='经度')
-    latitude = db.Column(db.Numeric(10, 8), comment='纬度')
-    location_type = db.Column(db.Enum('origin', 'settlement', 'node'), default='settlement', comment='地点类型')
-    admin_region = db.Column(db.String(255), comment='现代行政区划')
-    created_at = db.Column(db.DateTime, default=datetime.now, comment='记录创建时间')
+    location_id = db.Column('id', db.Integer, primary_key=True, autoincrement=True)
+    historical_name = db.Column(db.String(255), nullable=False)
+    modern_name = db.Column(db.String(255))
+    longitude = db.Column(db.Numeric(11, 8))
+    latitude = db.Column(db.Numeric(10, 8))
+    location_type = db.Column('type', db.Enum('origin', 'settlement', 'node'), default='settlement')
+    admin_region = db.Column(db.String(255))
+    population_estimate = db.Column(db.Integer)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
-    # 关系定义
-    migrations_from = db.relationship('OriginTracingMigrations',
-                                      foreign_keys='OriginTracingMigrations.from_location_id', backref='from_location',
-                                      lazy=True)
+    migrations_from = db.relationship('OriginTracingMigrations', foreign_keys='OriginTracingMigrations.from_location_id',
+                                      backref='from_location', lazy=True)
     migrations_to = db.relationship('OriginTracingMigrations', foreign_keys='OriginTracingMigrations.to_location_id',
                                     backref='to_location', lazy=True)
 
@@ -51,36 +53,44 @@ class OriginTracingLocations(db.Model):
 
 class OriginTracingMigrations(db.Model):
     """迁徙事件表"""
-    __tablename__ = 'Origin_Tracing_Migrations'
+    __tablename__ = 'migrations'
 
-    migration_id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='迁徙ID')
-    branch_id = db.Column(db.Integer, db.ForeignKey('Origin_Tracing_Branches.branch_id', ondelete='CASCADE'),
-                          nullable=False, comment='关联的分支ID')
-    from_location_id = db.Column(db.Integer, db.ForeignKey('Origin_Tracing_Locations.location_id'), nullable=False,
-                                 comment='迁出地ID')
-    to_location_id = db.Column(db.Integer, db.ForeignKey('Origin_Tracing_Locations.location_id'), nullable=False,
-                               comment='迁入地ID')
-    migration_period = db.Column(db.String(100), comment='迁徙年代')
-    estimated_year = db.Column(db.Integer, comment='估算年份')
-    migration_reason = db.Column(db.Text, comment='迁徙原因')
-    key_figure = db.Column(db.String(255), comment='关键人物')
-    description = db.Column(db.Text, comment='事件详细描述')
-    created_at = db.Column(db.DateTime, default=datetime.now, comment='记录创建时间')
+    migration_id = db.Column('id', db.Integer, primary_key=True, autoincrement=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id', ondelete='CASCADE'),
+                          nullable=False)
+    from_location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    to_location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    migration_period = db.Column('period', db.String(100))
+    estimated_year = db.Column(db.Integer)
+    reason = db.Column('reason', db.String(255))
+    reason_detail = db.Column(db.Text)
+    key_figure = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    route_points = db.Column(db.JSON)
+    distance_km = db.Column(db.Numeric(10, 2))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    def __repr__(self):
+        return f'<Migration {self.migration_id}>'
 
 
 class User(db.Model):
     """用户表"""
-    __tablename__ = 'Origin_Tracing_Users'
+    __tablename__ = 'users'
 
-    user_id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='用户ID')
-    username = db.Column(db.String(50), unique=True, nullable=False, comment='用户名')
-    password_hash = db.Column(db.String(255), nullable=False, comment='密码哈希')
-    role = db.Column(db.Enum('user', 'admin'), default='user', comment='角色: user-普通用户, admin-管理员')
-    real_name = db.Column(db.String(50), comment='真实姓名')
-    phone = db.Column(db.String(20), comment='联系电话')
-    is_active = db.Column(db.Boolean, default=True, comment='是否激活')
-    created_at = db.Column(db.DateTime, default=datetime.now, comment='注册时间')
-    last_login = db.Column(db.DateTime, comment='最后登录时间')
+    user_id = db.Column('id', db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(100))
+    role = db.Column(db.Enum('user', 'admin'), default='user')
+    real_name = db.Column(db.String(50))
+    phone = db.Column(db.String(20))
+    avatar_url = db.Column(db.String(500))
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    last_login = db.Column(db.DateTime)
 
     def set_password(self, password):
         """设置密码"""
@@ -95,63 +105,131 @@ class User(db.Model):
 
 
 class MigrationSubmission(db.Model):
-    """用户提交的迁徙口述史表"""
-    __tablename__ = 'Origin_Tracing_Migration_Submissions'
+    """用户提交表（合并迁徙口述史和族谱摘要）"""
+    __tablename__ = 'submissions'
 
-    submission_id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='提交ID')
-    user_id = db.Column(db.Integer, db.ForeignKey('Origin_Tracing_Users.user_id', ondelete='CASCADE'),
-                        nullable=False, comment='提交用户ID')
-    branch_name = db.Column(db.String(255), nullable=False, comment='分支名称')
-    surname = db.Column(db.String(50), default='姜', comment='姓氏')
-    migration_description = db.Column(db.Text, nullable=False, comment='迁徙口述史描述')
-    migration_period = db.Column(db.String(100), comment='迁徙年代')
-    estimated_year = db.Column(db.Integer, comment='估算年份')
-    migration_route = db.Column(db.Text, comment='迁徙路线描述（JSON格式）')
-    migration_reason = db.Column(db.Text, comment='迁徙原因')
-    key_figures = db.Column(db.Text, comment='关键人物')
-    source_reference = db.Column(db.String(500), comment='资料来源')
-    status = db.Column(db.Enum('pending', 'approved', 'rejected'), default='pending',
-                       comment='审核状态：pending待审核，approved已批准，rejected已拒绝')
-    reviewer_id = db.Column(db.Integer, db.ForeignKey('Origin_Tracing_Users.user_id', ondelete='SET NULL'),
-                            nullable=True, comment='审核员ID')
-    review_comment = db.Column(db.Text, comment='审核意见')
-    submitted_at = db.Column(db.DateTime, default=datetime.now, comment='提交时间')
-    reviewed_at = db.Column(db.DateTime, nullable=True, comment='审核时间')
+    submission_id = db.Column('id', db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                        nullable=False)
+    submission_type = db.Column('type', db.Enum('migration', 'family_tree'), nullable=False)
+    branch_name = db.Column(db.String(255), nullable=False)
+    surname = db.Column(db.String(50), default='姜')
+    content = db.Column(db.Text, nullable=False)
+    ancestral_home = db.Column(db.String(255))
+    first_ancestor = db.Column(db.String(255))
+    period = db.Column(db.String(100))
+    estimated_year = db.Column(db.Integer)
+    from_location = db.Column(db.String(255))
+    to_location = db.Column(db.String(255))
+    route_data = db.Column(db.JSON)
+    reason = db.Column('reason', db.String(255))
+    key_figures = db.Column(db.Text)
+    source_reference = db.Column(db.String(500))
+    contact_info = db.Column(db.String(255))
+    attachments = db.Column(db.JSON)
+    status = db.Column(db.Enum('pending', 'approved', 'rejected'), default='pending')
+    reviewer_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'),
+                            nullable=True)
+    review_comment = db.Column(db.Text)
+    submitted_at = db.Column(db.DateTime, default=datetime.now)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
 
-    # 关系定义
-    user = db.relationship('User', foreign_keys=[user_id], backref='migration_submissions')
-    reviewer = db.relationship('User', foreign_keys=[reviewer_id], backref='reviewed_migration_submissions')
-
-    def __repr__(self):
-        return f'<MigrationSubmission {self.branch_name} - {self.status}>'
-
-
-class FamilyTreeSubmission(db.Model):
-    """用户提交的私家族谱摘要表"""
-    __tablename__ = 'Origin_Tracing_Family_Tree_Submissions'
-
-    submission_id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='提交ID')
-    user_id = db.Column(db.Integer, db.ForeignKey('Origin_Tracing_Users.user_id', ondelete='CASCADE'),
-                        nullable=False, comment='提交用户ID')
-    branch_name = db.Column(db.String(255), nullable=False, comment='分支名称')
-    surname = db.Column(db.String(50), default='姜', comment='姓氏')
-    family_tree_summary = db.Column(db.Text, nullable=False, comment='族谱摘要')
-    ancestral_home = db.Column(db.String(255), comment='祖源地')
-    first_ancestor = db.Column(db.String(255), comment='始祖信息')
-    generation_info = db.Column(db.Text, comment='世代信息（JSON格式）')
-    key_descendants = db.Column(db.Text, comment='关键后裔')
-    source_reference = db.Column(db.String(500), comment='资料来源')
-    status = db.Column(db.Enum('pending', 'approved', 'rejected'), default='pending',
-                       comment='审核状态：pending待审核，approved已批准，rejected已拒绝')
-    reviewer_id = db.Column(db.Integer, db.ForeignKey('Origin_Tracing_Users.user_id', ondelete='SET NULL'),
-                            nullable=True, comment='审核员ID')
-    review_comment = db.Column(db.Text, comment='审核意见')
-    submitted_at = db.Column(db.DateTime, default=datetime.now, comment='提交时间')
-    reviewed_at = db.Column(db.DateTime, nullable=True, comment='审核时间')
-
-    # 关系定义
-    user = db.relationship('User', foreign_keys=[user_id], backref='family_tree_submissions')
-    reviewer = db.relationship('User', foreign_keys=[reviewer_id], backref='reviewed_family_tree_submissions')
+    user = db.relationship('User', foreign_keys=[user_id], backref='submissions')
+    reviewer = db.relationship('User', foreign_keys=[reviewer_id], backref='reviewed_submissions')
 
     def __repr__(self):
-        return f'<FamilyTreeSubmission {self.branch_name} - {self.status}>'
+        return f'<Submission {self.branch_name} - {self.submission_type} - {self.status}>'
+
+
+class PasswordResetRequest(db.Model):
+    """密码重置请求表"""
+    __tablename__ = 'password_reset_requests'
+
+    request_id = db.Column('id', db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                        nullable=False)
+    reason = db.Column(db.Text)
+    status = db.Column(db.Enum('pending', 'approved', 'rejected'), default='pending')
+    reviewer_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'),
+                            nullable=True)
+    review_comment = db.Column(db.Text)
+    new_password = db.Column(db.String(255))
+    requested_at = db.Column(db.DateTime, default=datetime.now)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship('User', foreign_keys=[user_id], backref='password_reset_requests')
+    reviewer = db.relationship('User', foreign_keys=[reviewer_id], backref='reviewed_password_requests')
+
+    def __repr__(self):
+        return f'<PasswordResetRequest {self.user.username} - {self.status}>'
+
+
+class UserBranchFavorite(db.Model):
+    """用户收藏分支表"""
+    __tablename__ = 'user_favorites'
+
+    favorite_id = db.Column('id', db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                        nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id', ondelete='CASCADE'),
+                          nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    user = db.relationship('User', backref='favorite_branches')
+    branch = db.relationship('OriginTracingBranches', backref='favorited_by_users')
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'branch_id', name='unique_user_branch'),
+    )
+
+    def __repr__(self):
+        return f'<UserBranchFavorite user={self.user_id} branch={self.branch_id}>'
+
+
+class SystemMeta(db.Model):
+    """系统元数据表（合并配置、日志、备份信息）"""
+    __tablename__ = 'system_meta'
+
+    meta_id = db.Column('id', db.Integer, primary_key=True, autoincrement=True)
+    meta_type = db.Column('type', db.Enum('config', 'log', 'backup'), nullable=False)
+    key = db.Column(db.String(100), nullable=False)
+    value = db.Column(db.JSON)
+    content = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
+    ip_address = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    user = db.relationship('User', backref='system_operations')
+
+    def __repr__(self):
+        return f'<SystemMeta {self.meta_type}:{self.key}>'
+
+    @staticmethod
+    def get_config(key, default=None):
+        """获取配置值"""
+        config = SystemMeta.query.filter_by(meta_type='config', key=key).first()
+        return config.value if config else default
+
+    @staticmethod
+    def set_config(key, value):
+        """设置配置值"""
+        config = SystemMeta.query.filter_by(meta_type='config', key=key).first()
+        if config:
+            config.value = value
+        else:
+            config = SystemMeta(meta_type='config', key=key, value=value)
+            db.session.add(config)
+        db.session.commit()
+
+    @staticmethod
+    def add_log(operation_type, content, user_id=None, ip_address=None):
+        """添加操作日志"""
+        log = SystemMeta(
+            meta_type='log',
+            key=operation_type,
+            content=content,
+            user_id=user_id,
+            ip_address=ip_address
+        )
+        db.session.add(log)
+        db.session.commit()

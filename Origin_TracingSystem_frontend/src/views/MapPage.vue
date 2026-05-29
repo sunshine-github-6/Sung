@@ -76,6 +76,17 @@
           <div class="button-glow"></div>
         </button>
         <button 
+          v-if="isAdmin" 
+          class="nav-button settings-button" 
+          @click="$router.push('/settings')"
+        >
+          <div class="button-content">
+            <span class="button-icon">🔧</span>
+            <span class="button-text">系统配置</span>
+          </div>
+          <div class="button-glow"></div>
+        </button>
+        <button 
           class="nav-button logout-button" 
           @click="handleLogout"
         >
@@ -96,6 +107,23 @@
         <div class="map-frame">
           <div ref="mapContainer" class="map-container"></div>
         </div>
+        
+        <!-- 收藏按钮 - 可拖动 -->
+        <div 
+          class="favorites-float-btn" 
+          @click.stop="showFavoritesPanel = true" 
+          v-if="userFavorites.length > 0"
+          :style="favoritesBtnStyle"
+          @mousedown="startDragFavoritesBtn"
+          title="拖动移动位置"
+        >
+          <div class="favorites-icon-wrapper">
+            <span class="favorites-icon">⭐</span>
+            <span class="favorites-count">{{ userFavorites.length }}</span>
+          </div>
+          <span class="favorites-label">我的收藏</span>
+          <span class="drag-indicator">⋮⋮</span>
+        </div>
       </div>
 
       <!-- 信息面板 -->
@@ -115,14 +143,29 @@
                     <p class="title-subtitle">Migration Details</p>
                   </div>
                 </div>
-                <el-button 
-                  class="close-btn" 
-                  text 
-                  circle
-                  @click="closeInfoCard"
-                >
-                  <span class="close-icon">✕</span>
-                </el-button>
+                <div class="header-actions">
+                  <!-- 收藏按钮 -->
+                  <el-button 
+                    class="favorite-btn" 
+                    text 
+                    circle
+                    :loading="favoriteLoading"
+                    @click="handleToggleFavorite"
+                    :title="isFavorite ? '取消收藏' : '收藏分支'"
+                  >
+                    <span class="favorite-icon" :class="{ 'is-favorite': isFavorite }">
+                      {{ isFavorite ? '★' : '☆' }}
+                    </span>
+                  </el-button>
+                  <el-button 
+                    class="close-btn" 
+                    text 
+                    circle
+                    @click="closeInfoCard"
+                  >
+                    <span class="close-icon">✕</span>
+                  </el-button>
+                </div>
               </div>
             </div>
             
@@ -369,38 +412,56 @@
       </div>
     </div>
 
-      <!-- 图例 -->
-      <div class="legend">
-        <el-card shadow="never" class="legend-card">
-          <div class="legend-title">图例</div>
-          <div class="legend-items">
-            <div class="legend-item">
-              <div class="legend-marker origin-marker"></div>
-              <span>起源点</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-marker settlement-marker"></div>
-              <span>定居点</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-marker start-marker"></div>
-              <span>起点</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-marker end-marker"></div>
-              <span>终点</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-marker waypoint-marker"></div>
-              <span>途径地</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-line"></div>
-              <span>迁徙路线</span>
+    <!-- 图例 -->
+    <div class="legend">
+      <el-card shadow="never" class="legend-card">
+        <div class="legend-title">图例</div>
+        <div class="legend-items">
+          <div class="legend-item">
+            <div class="legend-marker origin-marker"></div>
+            <span>起源点</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-marker settlement-marker"></div>
+            <span>定居点</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-marker start-marker"></div>
+            <span>起点</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-marker end-marker"></div>
+            <span>终点</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-marker waypoint-marker"></div>
+            <span>途径地</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-line"></div>
+            <span>迁徙路线</span>
+          </div>
+          <div class="legend-item" v-if="userFavorites.length > 0">
+            <div class="legend-marker favorite-marker">⭐</div>
+            <span>收藏分支</span>
+          </div>
+          <!-- 热力图图例 -->
+          <div class="legend-item heatmap-legend-item" v-if="showHeatMap">
+            <div class="heatmap-legend">
+              <div class="heatmap-legend-title">🔥 热力程度</div>
+              <div class="heatmap-gradient-bar">
+                <div class="gradient-labels">
+                  <span class="gradient-label high">高</span>
+                  <span class="gradient-label medium">中</span>
+                  <span class="gradient-label low">低</span>
+                </div>
+                <div class="gradient-bar"></div>
+              </div>
             </div>
           </div>
-        </el-card>
-      </div>
+        </div>
+      </el-card>
+    </div>
       
       <!-- 地图样式面板切换开关 -->
       <div class="style-toggle">
@@ -488,9 +549,45 @@
                   >
                     🌙 暗色
                   </el-button>
+                  <el-button 
+                    size="large" 
+                    :type="mapStyle === 'light' ? 'primary' : 'default'"
+                    @click="handleMapStyleChange('light')"
+                    title="浅色地图"
+                    class="style-option-btn"
+                  >
+                    ☀️ 浅色
+                  </el-button>
+                  <el-button 
+                    size="large" 
+                    :type="mapStyle === 'fresh' ? 'primary' : 'default'"
+                    @click="handleMapStyleChange('fresh')"
+                    title="清新地图"
+                    class="style-option-btn"
+                  >
+                    🌿 清新
+                  </el-button>
+                  <el-button 
+                    size="large" 
+                    :type="mapStyle === 'macaron' ? 'primary' : 'default'"
+                    @click="handleMapStyleChange('macaron')"
+                    title="马卡龙地图"
+                    class="style-option-btn"
+                  >
+                    🍬 马卡龙
+                  </el-button>
+                  <el-button 
+                    size="large" 
+                    :type="mapStyle === 'blue' ? 'primary' : 'default'"
+                    @click="handleMapStyleChange('blue')"
+                    title="靛青地图"
+                    class="style-option-btn"
+                  >
+                    🔷 靛青
+                  </el-button>
                 </div>
                 <div class="style-hint">
-                  <small>提示：地图样式切换可能会出现短暂错误，不会影响地图基本功能</small>
+                  <small>提示：点击按钮即可切换地图样式</small>
                 </div>
               </div>
             </div>
@@ -778,95 +875,251 @@
                 <div class="raster-layer-section">
                   <div class="section-title">图层类型</div>
                   <el-radio-group v-model="rasterLayerType" class="layer-type-selector">
-                    <el-radio label="tile">瓦片图层</el-radio>
-                    <el-radio label="image">单张图片</el-radio>
-                    <el-radio label="heatmap">热力图</el-radio>
+                    <el-radio label="tile">
+                      <span class="layer-type-icon">🗺️</span>瓦片图层
+                    </el-radio>
+                    <el-radio label="image">
+                      <span class="layer-type-icon">🖼️</span>单张图片
+                    </el-radio>
+                    <el-radio label="heatmap">
+                      <span class="layer-type-icon">🔥</span>热力图
+                    </el-radio>
                   </el-radio-group>
                 </div>
                 
                 <!-- 瓦片图层配置 -->
                 <div v-if="rasterLayerType === 'tile'" class="raster-layer-section">
-                  <el-input
-                    v-model="tileLayerUrl"
-                    placeholder="瓦片图层URL模板..."
-                    clearable
-                    style="margin-bottom: 15px;"
-                  >
-                    <template #prefix>
-                      <span>🔗</span>
-                    </template>
-                  </el-input>
-                  <el-input-number
-                    v-model="tileLayerOpacity"
-                    :min="0"
-                    :max="1"
-                    :step="0.1"
-                    placeholder="透明度"
-                    style="width: 100%; margin-bottom: 15px;"
-                  />
-                  <el-button 
-                    type="primary" 
+                  <div class="url-input-group">
+                    <el-input
+                      v-model="tileLayerUrl"
+                      placeholder="https://example.com/tiles/{z}/{x}/{y}.png"
+                      clearable
+                      style="margin-bottom: 8px;"
+                    >
+                      <template #prefix>
+                        <span>🔗</span>
+                      </template>
+                    </el-input>
+                    <div class="url-examples">
+                      <small class="example-title">示例格式（点击填充）:</small>
+                      <div class="example-tags">
+                        <el-tag
+                          size="small"
+                          class="example-tag"
+                          @click="tileLayerUrl = 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'"
+                          title="OpenStreetMap"
+                        >
+                          OSM
+                        </el-tag>
+                        <el-tag
+                          size="small"
+                          class="example-tag"
+                          @click="tileLayerUrl = 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}'"
+                          title="高德路网"
+                        >
+                          高德路网
+                        </el-tag>
+                        <el-tag
+                          size="small"
+                          class="example-tag"
+                          @click="tileLayerUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'"
+                          title="ArcGIS 卫星图"
+                        >
+                          卫星图
+                        </el-tag>
+                        <el-tag
+                          size="small"
+                          class="example-tag"
+                          @click="tileLayerUrl = 'https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=2&style=8&ltype=11'"
+                          title="高德注记"
+                        >
+                          高德注记
+                        </el-tag>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="opacity-control">
+                    <label class="control-label">
+                      <span>👁️</span> 透明度: {{ Math.round(tileLayerOpacity * 100) }}%
+                    </label>
+                    <el-slider
+                      v-model="tileLayerOpacity"
+                      :min="0"
+                      :max="1"
+                      :step="0.1"
+                      show-stops
+                    />
+                  </div>
+                  <el-button
+                    type="primary"
                     @click="addTileLayer"
                     :disabled="!tileLayerUrl"
-                    style="width: 100%;"
+                    style="width: 100%; margin-top: 10px;"
                   >
-                    添加瓦片图层
+                    <span class="btn-icon">➕</span> 添加瓦片图层
                   </el-button>
                 </div>
                 
                 <!-- 单张图片图层配置 -->
                 <div v-else-if="rasterLayerType === 'image'" class="raster-layer-section">
-                  <el-input
-                    v-model="imageLayerUrl"
-                    placeholder="图片URL..."
-                    clearable
-                    style="margin-bottom: 15px;"
-                  >
-                    <template #prefix>
-                      <span>🖼️</span>
-                    </template>
-                  </el-input>
-                  <el-input-number
-                    v-model="imageLayerOpacity"
-                    :min="0"
-                    :max="1"
-                    :step="0.1"
-                    placeholder="透明度"
-                    style="width: 100%; margin-bottom: 15px;"
-                  />
-                  <el-button 
-                    type="primary" 
+                  <div class="url-input-group">
+                    <el-input
+                      v-model="imageLayerUrl"
+                      placeholder="https://example.com/image.png"
+                      clearable
+                      style="margin-bottom: 8px;"
+                    >
+                      <template #prefix>
+                        <span>🖼️</span>
+                      </template>
+                    </el-input>
+                    <div class="url-hint">
+                      <small>支持 PNG、JPG、JPEG 格式，图片将被拉伸到指定地理范围</small>
+                    </div>
+                    <el-button
+                      type="default"
+                      @click="triggerLocalImageUpload"
+                      style="width: 100%; margin-top: 8px;"
+                    >
+                      <span class="btn-icon">📁</span> 本地上传照片
+                    </el-button>
+                    <input
+                      ref="localImageInput"
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      style="display: none;"
+                      @change="handleLocalImageUpload"
+                    />
+                  </div>
+
+                  <!-- 地理范围配置 -->
+                  <div class="bounds-config">
+                    <label class="control-label">
+                      <span>🗺️</span> 地理范围（经纬度）
+                    </label>
+                    <div class="bounds-inputs">
+                      <el-input
+                        v-model="imageBounds.southwestLng"
+                        placeholder="西南经度"
+                        size="small"
+                        style="margin-bottom: 8px;"
+                      />
+                      <el-input
+                        v-model="imageBounds.southwestLat"
+                        placeholder="西南纬度"
+                        size="small"
+                        style="margin-bottom: 8px;"
+                      />
+                      <el-input
+                        v-model="imageBounds.northeastLng"
+                        placeholder="东北经度"
+                        size="small"
+                        style="margin-bottom: 8px;"
+                      />
+                      <el-input
+                        v-model="imageBounds.northeastLat"
+                        placeholder="东北纬度"
+                        size="small"
+                        style="margin-bottom: 8px;"
+                      />
+                    </div>
+                    <div class="bounds-presets">
+                      <small class="example-title">快速选择范围:</small>
+                      <div class="preset-tags">
+                        <el-tag
+                          size="small"
+                          class="preset-tag"
+                          @click="setImageBounds('china')"
+                        >
+                          中国范围
+                        </el-tag>
+                        <el-tag
+                          size="small"
+                          class="preset-tag"
+                          @click="setImageBounds('world')"
+                        >
+                          世界范围
+                        </el-tag>
+                        <el-tag
+                          size="small"
+                          class="preset-tag"
+                          @click="setImageBounds('cqfinance')"
+                        >
+                          重庆财经学院
+                        </el-tag>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="opacity-control">
+                    <label class="control-label">
+                      <span>👁️</span> 透明度: {{ Math.round(imageLayerOpacity * 100) }}%
+                    </label>
+                    <el-slider
+                      v-model="imageLayerOpacity"
+                      :min="0"
+                      :max="1"
+                      :step="0.1"
+                      show-stops
+                    />
+                  </div>
+
+                  <el-button
+                    type="primary"
                     @click="addImageLayer"
-                    :disabled="!imageLayerUrl"
-                    style="width: 100%;"
+                    :disabled="!imageLayerUrl || !isValidBounds"
+                    style="width: 100%; margin-top: 10px;"
                   >
-                    添加图片图层
+                    <span class="btn-icon">➕</span> 添加图片图层
                   </el-button>
                 </div>
                 
                 <!-- 热力图配置 -->
                 <div v-else-if="rasterLayerType === 'heatmap'" class="raster-layer-section">
-                  <el-input-number
-                    v-model="heatmapRadius"
-                    :min="5"
-                    :max="100"
-                    placeholder="热力图半径"
-                    style="width: 100%; margin-bottom: 15px;"
-                  />
-                  <el-input-number
-                    v-model="heatmapOpacity"
-                    :min="0"
-                    :max="1"
-                    :step="0.1"
-                    placeholder="透明度"
-                    style="width: 100%; margin-bottom: 15px;"
-                  />
+                  <div class="heatmap-header">
+                    <span class="heatmap-icon">🔥</span>
+                    <span class="heatmap-title">热力图配置</span>
+                  </div>
+                  <div class="heatmap-config-item">
+                    <label class="config-label">
+                      <span class="config-icon">📏</span>热力半径: {{ heatmapRadius }}px
+                    </label>
+                    <el-slider
+                      v-model="heatmapRadius"
+                      :min="20"
+                      :max="100"
+                      :step="5"
+                      show-stops
+                    />
+                    <span class="config-hint">半径越大，热力区域越明显（建议50-80）</span>
+                  </div>
+                  <div class="heatmap-config-item">
+                    <label class="config-label">
+                      <span class="config-icon">👁️</span>透明度: {{ Math.round(heatmapOpacity * 100) }}%
+                    </label>
+                    <el-slider
+                      v-model="heatmapOpacity"
+                      :min="0.5"
+                      :max="1"
+                      :step="0.05"
+                    />
+                    <span class="config-hint">透明度越高，颜色越鲜明（建议90%以上）</span>
+                  </div>
                   <el-button 
                     type="primary" 
                     @click="toggleHeatMap"
+                    style="width: 100%; margin-bottom: 10px;"
+                  >
+                    <span class="btn-icon">{{ showHeatMap ? '🚫' : '🔥' }}</span>
+                    {{ showHeatMap ? '关闭热力图' : '显示热力图' }}
+                  </el-button>
+                  <el-button 
+                    v-if="showHeatMap"
+                    type="warning" 
+                    @click="refreshHeatMap"
                     style="width: 100%;"
                   >
-                    {{ showHeatMap ? '关闭热力图' : '显示热力图' }}
+                    <span class="btn-icon">🔄</span>重新生成（应用新参数）
                   </el-button>
                 </div>
                 
@@ -887,7 +1140,13 @@
                         >
                           <div class="layer-item-container">
                             <div class="layer-info">
-                              <div class="layer-name">{{ layer.name }}</div>
+                              <div class="layer-name">
+                                <span class="layer-icon" v-if="layer.type === '热力图'">🔥</span>
+                                <span class="layer-icon" v-else-if="layer.type === '瓦片'">🗺️</span>
+                                <span class="layer-icon" v-else-if="layer.type === '图片'">🖼️</span>
+                                <span class="layer-icon" v-else>📊</span>
+                                {{ layer.name }}
+                              </div>
                               <div class="layer-type">{{ layer.type }}</div>
                             </div>
                             
@@ -1299,6 +1558,79 @@
         </div>
       </div>
     </transition>
+
+    <!-- 收藏列表面板 -->
+    <transition name="slide-fade">
+      <div v-if="showFavoritesPanel" class="favorites-panel-card">
+        <div class="card-wrapper">
+          <!-- 卡片头部 -->
+          <div class="card-header">
+            <div class="header-gradient favorite-gradient"></div>
+            <div class="header-content">
+              <div class="card-title">
+                <div class="title-icon-wrapper favorite-icon-bg">
+                  <span class="title-icon">⭐</span>
+                </div>
+                <div class="title-text">
+                  <h3>我的收藏</h3>
+                  <p class="title-subtitle">My Favorites</p>
+                </div>
+              </div>
+              <el-button 
+                class="close-btn" 
+                text 
+                circle
+                @click="showFavoritesPanel = false"
+              >
+                <span class="close-icon">✕</span>
+              </el-button>
+            </div>
+          </div>
+          
+          <!-- 卡片内容 -->
+          <div class="card-body">
+            <div v-if="userFavorites.length === 0" class="empty-favorites">
+              <span class="empty-icon">📭</span>
+              <p>暂无收藏的分支</p>
+              <span class="empty-tip">点击分支详情页的收藏按钮即可添加</span>
+            </div>
+            <div v-else class="favorites-list">
+              <div 
+                v-for="favorite in userFavorites" 
+                :key="favorite.id"
+                class="favorite-item"
+                @click="handleFavoriteClick(favorite)"
+              >
+                <div class="favorite-info">
+                  <div class="favorite-branch-name">
+                    <span class="branch-icon">🏛️</span>
+                    {{ favorite.branch_name }}
+                  </div>
+                  <div class="favorite-ancestral-home" v-if="favorite.ancestral_home">
+                    <span class="location-icon">📍</span>
+                    {{ favorite.ancestral_home }}
+                  </div>
+                  <div class="favorite-time">
+                    <span class="time-icon">🕐</span>
+                    收藏于 {{ formatFavoriteTime(favorite.created_at) }}
+                  </div>
+                </div>
+                <el-button 
+                  class="remove-favorite-btn"
+                  type="danger"
+                  text
+                  circle
+                  size="small"
+                  @click.stop="handleRemoveFavorite(favorite.branch_id)"
+                >
+                  <span class="remove-icon">🗑️</span>
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -1308,6 +1640,7 @@ import { useRouter } from 'vue-router'
 import { initAMap, addOverlays, removeOverlays, fitView, cleanupCustomControls, createRasterLayer, createHeatMap } from '@/utils/amap'
 import { fetchMigrations, fetchStatistics, fetchLocations } from '@/api/genealogy'
 import { logout } from '@/api/auth'
+import { getUserFavorites, toggleFavorite, checkIsFavorite } from '@/api/favorites'
 import { ElCard, ElButton, ElAlert, ElIcon, ElInput, ElSelect, ElOption, ElCheckbox, ElInputNumber, ElMessageBox, ElMessage, ElDialog, ElRow, ElCol, ElScrollbar, ElRadio, ElRadioGroup, ElCheckboxGroup } from 'element-plus'
 import backgroundImage from '@/img/background.png'
 
@@ -1418,8 +1751,16 @@ const tileLayerUrl = ref('') // 瓦片图层URL
 const tileLayerOpacity = ref(0.7) // 瓦片图层透明度
 const imageLayerUrl = ref('') // 单张图片URL
 const imageLayerOpacity = ref(0.7) // 单张图片透明度
-const heatmapRadius = ref(25) // 热力图半径
-const heatmapOpacity = ref(0.7) // 热力图透明度
+const localImageInput = ref(null) // 本地上传图片input引用
+// 图片图层地理范围
+const imageBounds = ref({
+  southwestLng: '73.5',
+  southwestLat: '18.1',
+  northeastLng: '135.1',
+  northeastLat: '53.5'
+})
+const heatmapRadius = ref(50) // 热力图半径 - 增大以显示更明显的效果
+const heatmapOpacity = ref(0.95) // 热力图透明度 - 提高使颜色更鲜明
 const showHeatMap = ref(false) // 是否显示热力图
 const addedLayers = ref([]) // 已添加的图层列表
 const checkedLayers = ref([]) // 已选中的图层
@@ -1427,10 +1768,105 @@ const layerIdCounter = ref(1) // 图层ID计数器
 const rasterLayers = ref([]) // 栅格图层实例列表
 const heatmapLayer = ref(null) // 热力图层实例
 
+// 计算属性：验证地理范围是否有效
+const isValidBounds = computed(() => {
+  const { southwestLng, southwestLat, northeastLng, northeastLat } = imageBounds.value
+  const swLng = parseFloat(southwestLng)
+  const swLat = parseFloat(southwestLat)
+  const neLng = parseFloat(northeastLng)
+  const neLat = parseFloat(northeastLat)
+
+  return !isNaN(swLng) && !isNaN(swLat) && !isNaN(neLng) && !isNaN(neLat) &&
+         swLng >= -180 && swLng <= 180 &&
+         neLng >= -180 && neLng <= 180 &&
+         swLat >= -90 && swLat <= 90 &&
+         neLat >= -90 && neLat <= 90 &&
+         swLng < neLng && swLat < neLat
+})
+
+// 设置图片图层地理范围
+function setImageBounds(type) {
+  if (type === 'china') {
+    imageBounds.value = {
+      southwestLng: '73.5',
+      southwestLat: '18.1',
+      northeastLng: '135.1',
+      northeastLat: '53.5'
+    }
+  } else if (type === 'world') {
+    imageBounds.value = {
+      southwestLng: '-180',
+      southwestLat: '-85',
+      northeastLng: '180',
+      northeastLat: '85'
+    }
+  } else if (type === 'cqfinance') {
+    imageBounds.value = {
+      southwestLng: '104.52',
+      southwestLat: '27.35',
+      northeastLng: '108.52',
+      northeastLat: '31.35'
+    }
+  }
+}
+
 // 筛选条件
 const filterBranches = ref([]) // 选中的分支
 const filterYearStart = ref(null) // 起始年份
 const filterYearEnd = ref(null) // 结束年份
+
+// 用户收藏分支相关状态
+const userFavorites = ref([]) // 用户收藏的分支列表
+const isFavorite = ref(false) // 当前选中的分支是否已收藏
+const showFavoritesPanel = ref(false) // 控制收藏面板显示
+const favoriteLoading = ref(false) // 收藏操作加载状态
+
+// 收藏按钮拖拽相关状态
+const favoritesBtnPosition = ref({ x: 0, y: 0 }) // 收藏按钮位置（相对于初始位置）
+const isDraggingFavoritesBtn = ref(false) // 是否正在拖拽收藏按钮
+const favoritesBtnDragStart = ref({ x: 0, y: 0 }) // 拖拽起始位置
+const hasDraggedFavoritesBtn = ref(false) // 是否完成过拖拽
+
+// 收藏按钮样式
+const favoritesBtnStyle = computed(() => {
+  if (!hasDraggedFavoritesBtn.value) {
+    return {}
+  }
+  return {
+    right: 'auto',
+    left: `${favoritesBtnPosition.value.x}px`,
+    top: `${favoritesBtnPosition.value.y}px`
+  }
+})
+
+// 开始拖拽收藏按钮
+function startDragFavoritesBtn(e) {
+  isDraggingFavoritesBtn.value = true
+  hasDraggedFavoritesBtn.value = true
+  favoritesBtnDragStart.value = {
+    x: e.clientX - favoritesBtnPosition.value.x,
+    y: e.clientY - favoritesBtnPosition.value.y
+  }
+  document.addEventListener('mousemove', onDragFavoritesBtn)
+  document.addEventListener('mouseup', stopDragFavoritesBtn)
+}
+
+// 拖拽中
+function onDragFavoritesBtn(e) {
+  if (!isDraggingFavoritesBtn.value) return
+  e.preventDefault()
+  favoritesBtnPosition.value = {
+    x: e.clientX - favoritesBtnDragStart.value.x,
+    y: e.clientY - favoritesBtnDragStart.value.y
+  }
+}
+
+// 停止拖拽
+function stopDragFavoritesBtn() {
+  isDraggingFavoritesBtn.value = false
+  document.removeEventListener('mousemove', onDragFavoritesBtn)
+  document.removeEventListener('mouseup', stopDragFavoritesBtn)
+}
 const filterReasons = ref([]) // 选中的迁徙原因
 const filterLocation = ref('') // 地点关键词
 
@@ -2035,14 +2471,14 @@ document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 onMounted(async () => {
   // 等待 DOM 渲染完成
   await nextTick()
-  
+
   if (!mapContainer.value) {
     error.value = '地图容器未正确初始化'
     errorDescription.value = '请检查控制台了解详细信息'
     loading.value = false
     return
   }
-  
+
   // 加载统计数据
   try {
     statistics.value = await fetchStatistics()
@@ -2050,7 +2486,7 @@ onMounted(async () => {
   } catch (err) {
 
   }
-  
+
   // 加载所有定居点数据
   try {
     locations.value = await fetchLocations()
@@ -2058,7 +2494,10 @@ onMounted(async () => {
   } catch (err) {
 
   }
-  
+
+  // 加载用户收藏列表
+  await loadUserFavorites()
+
   // 初始化地图
   await initMap()
 })
@@ -2184,6 +2623,182 @@ function closeInfoCard() {
   // 恢复所有路径的透明度
   polylines.value.forEach(line => {
     line.setOptions({ strokeOpacity: 0.7, strokeWeight: 4 })
+  })
+}
+
+// 获取当前用户ID
+function getCurrentUserId() {
+  const userInfoStr = sessionStorage.getItem('userInfo')
+  if (!userInfoStr) return null
+  try {
+    const userInfo = JSON.parse(userInfoStr)
+    return userInfo?.user_id || null
+  } catch (e) {
+    return null
+  }
+}
+
+// 加载用户收藏列表
+async function loadUserFavorites() {
+  const userId = getCurrentUserId()
+  if (!userId) return
+  
+  try {
+    const favorites = await getUserFavorites(userId)
+    userFavorites.value = favorites
+  } catch (error) {
+    console.error('加载收藏列表失败:', error)
+  }
+}
+
+// 检查当前分支是否已收藏
+async function checkCurrentFavorite() {
+  const userId = getCurrentUserId()
+  if (!userId || !selectedMigration.value) {
+    isFavorite.value = false
+    return
+  }
+  
+  try {
+    const branchId = selectedMigration.value.properties.branch_id
+    if (branchId) {
+      const favorite = await checkIsFavorite(userId, branchId)
+      isFavorite.value = favorite
+    }
+  } catch (error) {
+    console.error('检查收藏状态失败:', error)
+    isFavorite.value = false
+  }
+}
+
+// 处理收藏/取消收藏
+async function handleToggleFavorite() {
+  const userId = getCurrentUserId()
+  if (!userId) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  if (!selectedMigration.value) {
+    ElMessage.warning('请先选择一个分支')
+    return
+  }
+  
+  const branchId = selectedMigration.value.properties.branch_id
+  if (!branchId) {
+    ElMessage.warning('无法获取分支信息')
+    return
+  }
+  
+  favoriteLoading.value = true
+  
+  try {
+    await toggleFavorite(userId, branchId, isFavorite.value)
+    isFavorite.value = !isFavorite.value
+    
+    // 刷新收藏列表
+    await loadUserFavorites()
+    
+    ElMessage.success(isFavorite.value ? '收藏成功' : '取消收藏成功')
+  } catch (error) {
+    ElMessage.error(error.message || '操作失败')
+  } finally {
+    favoriteLoading.value = false
+  }
+}
+
+// 处理收藏项点击 - 跳转到对应分支
+function handleFavoriteClick(favorite) {
+  // 关闭收藏面板
+  showFavoritesPanel.value = false
+  
+  // 查找对应的迁徙记录
+  const migration = migrations.value.find(m => 
+    m.properties.branch_id === favorite.branch_id
+  )
+  
+  if (migration) {
+    // 选中该迁徙记录
+    selectedMigration.value = migration
+    
+    // 检查收藏状态
+    checkCurrentFavorite()
+    
+    // 如果有坐标，将地图中心移动到该位置
+    if (migration.geometry && migration.geometry.coordinates) {
+      const coords = migration.geometry.coordinates
+      if (coords.length >= 2) {
+        const center = coords[Math.floor(coords.length / 2)]
+        if (mapInstance.value) {
+          mapInstance.value.setCenter(center)
+          mapInstance.value.setZoom(8)
+        }
+      }
+    }
+    
+    ElMessage.success(`已定位到：${favorite.branch_name}`)
+  } else {
+    ElMessage.warning('未找到该分支的迁徙数据')
+  }
+}
+
+// 处理删除收藏
+async function handleRemoveFavorite(branchId) {
+  const userId = getCurrentUserId()
+  if (!userId) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  try {
+    await toggleFavorite(userId, branchId, true)
+    
+    // 刷新收藏列表
+    await loadUserFavorites()
+    
+    // 如果当前选中的分支被删除收藏，更新收藏状态
+    if (selectedMigration.value && 
+        selectedMigration.value.properties.branch_id === branchId) {
+      isFavorite.value = false
+    }
+    
+    ElMessage.success('已取消收藏')
+  } catch (error) {
+    ElMessage.error(error.message || '操作失败')
+  }
+}
+
+// 格式化收藏时间
+function formatFavoriteTime(timeStr) {
+  if (!timeStr) return '未知时间'
+  
+  const date = new Date(timeStr)
+  const now = new Date()
+  const diff = now - date
+  
+  // 小于1小时
+  if (diff < 3600000) {
+    const minutes = Math.floor(diff / 60000)
+    return minutes < 1 ? '刚刚' : `${minutes}分钟前`
+  }
+  
+  // 小于24小时
+  if (diff < 86400000) {
+    const hours = Math.floor(diff / 3600000)
+    return `${hours}小时前`
+  }
+  
+  // 小于7天
+  if (diff < 604800000) {
+    const days = Math.floor(diff / 86400000)
+    return `${days}天前`
+  }
+  
+  // 超过7天显示具体日期
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
   })
 }
 
@@ -2341,20 +2956,48 @@ function resetFilters() {
 function handleMapStyleChange(style) {
   if (mapInstance.value) {
     try {
-      // 高德地图支持的标准样式名称
-      mapInstance.value.setMapStyle(style);
-      mapStyle.value = style;
+      // 高德地图 JS API 2.0 使用 setMapStyle 方法传入对象
+      // 支持 'amap://styles/normal' 和 'amap://styles/dark' 等标准样式
+      const styleMap = {
+        'normal': 'amap://styles/normal',
+        'dark': 'amap://styles/dark',
+        'light': 'amap://styles/light',
+        'whitesmoke': 'amap://styles/whitesmoke',
+        'fresh': 'amap://styles/fresh',
+        'grey': 'amap://styles/grey',
+        'graffiti': 'amap://styles/graffiti',
+        'macaron': 'amap://styles/macaron',
+        'blue': 'amap://styles/blue',
+        'darkblue': 'amap://styles/darkblue'
+      }
       
-
+      const styleUrl = styleMap[style] || 'amap://styles/normal'
+      mapInstance.value.setMapStyle(styleUrl)
+      mapStyle.value = style
+      
+      const styleNames = {
+        'normal': '标准',
+        'dark': '暗色',
+        'light': '浅色',
+        'whitesmoke': '烟白',
+        'fresh': '清新',
+        'grey': '灰白',
+        'graffiti': '涂鸦',
+        'macaron': '马卡龙',
+        'blue': '靛青',
+        'darkblue': '深蓝'
+      }
+      ElMessage.success(`已切换到${styleNames[style] || style}地图`)
     } catch (error) {
-
+      console.error('地图样式切换失败:', error)
+      ElMessage.error('地图样式切换失败，请重试')
+      
       // 如果 setMapStyle 失败，使用默认样式
       try {
-        mapInstance.value.setMapStyle('normal');
-        mapStyle.value = 'normal';
-
+        mapInstance.value.setMapStyle('amap://styles/normal')
+        mapStyle.value = 'normal'
       } catch (fallbackError) {
-
+        console.error('恢复默认样式失败:', fallbackError)
       }
     }
   }
@@ -2902,13 +3545,19 @@ function renderMigrationsOnMap() {
           if (!mapInstance.value) return
           selectedMigration.value = {
             properties: {
+              migration_id: migration.properties.migration_id,
+              branch_id: migration.properties.branch_id,
               branch_name: migration.properties.branch_name,
               surname: migration.properties.surname,
               migration_period: migration.properties.migration_period,
+              estimated_year: migration.properties.estimated_year,
               migration_reason: migration.properties.migration_reason,
               key_figure: migration.properties.key_figure,
+              description: migration.properties.description,
               from_name: migration.properties.from_name,
-              to_name: migration.properties.to_name
+              to_name: migration.properties.to_name,
+              historical_summary: migration.properties.historical_summary,
+              source_reference: migration.properties.source_reference
             },
             geometry: {
               coordinates: [startPoint]
@@ -2950,13 +3599,19 @@ function renderMigrationsOnMap() {
           if (!mapInstance.value) return
           selectedMigration.value = {
             properties: {
+              migration_id: migration.properties.migration_id,
+              branch_id: migration.properties.branch_id,
               branch_name: migration.properties.branch_name,
               surname: migration.properties.surname,
               migration_period: migration.properties.migration_period,
+              estimated_year: migration.properties.estimated_year,
               migration_reason: migration.properties.migration_reason,
               key_figure: migration.properties.key_figure,
+              description: migration.properties.description,
               from_name: migration.properties.from_name,
-              to_name: migration.properties.to_name
+              to_name: migration.properties.to_name,
+              historical_summary: migration.properties.historical_summary,
+              source_reference: migration.properties.source_reference
             },
             geometry: {
               coordinates: [endPoint]
@@ -3153,6 +3808,15 @@ function createSettlementIcon(isOrigin = false) {
 
 
 
+// 监听选中迁徙记录变化，检查收藏状态
+watch(selectedMigration, async (newVal) => {
+  if (newVal) {
+    await checkCurrentFavorite()
+  } else {
+    isFavorite.value = false
+  }
+})
+
 // 监听图层选中状态变化
 watch(checkedLayers, (newChecked, oldChecked) => {
   // 找出新增的选中项
@@ -3218,21 +3882,53 @@ function addTileLayer() {
   }
 }
 
+// 触发本地上传图片
+function triggerLocalImageUpload() {
+  localImageInput.value?.click();
+}
+
+// 处理本地上传图片
+function handleLocalImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.match(/image\/(png|jpeg|jpg)/)) {
+    ElMessage.error('请选择 PNG、JPG 或 JPEG 格式的图片');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    imageLayerUrl.value = e.target.result;
+    ElMessage.success('图片已加载，请设置地理范围后添加图层');
+  };
+  reader.onerror = () => {
+    ElMessage.error('图片读取失败');
+  };
+  reader.readAsDataURL(file);
+
+  event.target.value = '';
+}
+
 // 添加单张图片图层
 function addImageLayer() {
   if (!amap.value || !mapInstance.value || !imageLayerUrl.value) {
     ElMessage.error('请输入有效的图片URL');
     return;
   }
-  
+
+  if (!isValidBounds.value) {
+    ElMessage.error('请输入有效的地理范围');
+    return;
+  }
+
   try {
-    // 这里简化处理，实际应用中需要用户指定图片的地理范围
-    // 示例：使用中国大致范围作为默认边界
+    // 使用用户配置的地理范围
     const bounds = new amap.value.Bounds(
-      [73.5, 18.1], // 西南角
-      [135.1, 53.5]  // 东北角
+      [parseFloat(imageBounds.value.southwestLng), parseFloat(imageBounds.value.southwestLat)], // 西南角
+      [parseFloat(imageBounds.value.northeastLng), parseFloat(imageBounds.value.northeastLat)]  // 东北角
     );
-    
+
     const layerId = layerIdCounter.value++;
     const imageLayer = createRasterLayer(amap.value, {
       type: 'image',
@@ -3241,10 +3937,10 @@ function addImageLayer() {
       opacity: imageLayerOpacity.value,
       zIndex: 20
     });
-    
+
     if (imageLayer) {
       imageLayer.setMap(mapInstance.value);
-      
+
       // 添加到图层列表
       addedLayers.value.push({
         id: layerId,
@@ -3256,21 +3952,21 @@ function addImageLayer() {
         instance: imageLayer,
         visible: true
       });
-      
+
       // 默认选中
       checkedLayers.value.push(layerId);
-      
+
       ElMessage.success('单张图片图层添加成功');
       imageLayerUrl.value = ''; // 清空输入框
     }
   } catch (error) {
     console.error('添加单张图片图层失败:', error);
-    ElMessage.error('添加单张图片图层失败');
+    ElMessage.error('添加单张图片图层失败: ' + error.message);
   }
 }
 
 // 切换热力图显示
-function toggleHeatMap() {
+async function toggleHeatMap() {
   if (!amap.value || !mapInstance.value) {
     ElMessage.error('地图尚未初始化');
     return;
@@ -3294,31 +3990,92 @@ function toggleHeatMap() {
         if (checkedIndex !== -1) {
           checkedLayers.value.splice(checkedIndex, 1);
         }
+        
         // 从列表中移除
         addedLayers.value.splice(heatmapIndex, 1);
       }
       
+      // 清除圆形标记
+      clearHeatmapCircles();
+      
       ElMessage.success('热力图已关闭');
     } else {
       // 显示热力图
+      console.log('=== 开始显示热力图 ===');
+      console.log('地图实例:', mapInstance.value ? '已初始化' : '未初始化');
+      console.log('AMap:', amap.value ? '已加载' : '未加载');
+      
       // 从迁徙数据和定居点数据生成热力图数据
       const heatmapData = generateHeatmapData();
       
+      console.log('生成的热力图数据点数:', heatmapData.length);
+      
       if (heatmapData.length === 0) {
         ElMessage.warning('没有足够的数据生成热力图');
+        console.warn('热力图数据为空');
         return;
       }
       
+      // 显示前10个数据点用于调试
+      console.log('前10个热力图数据点:', heatmapData.slice(0, 10));
+      
       // 创建热力图，并直接关联到地图
-      const heatmap = createHeatMap(amap.value, mapInstance.value, heatmapData, {
+      console.log('创建热力图，配置:', {
         radius: heatmapRadius.value,
         opacity: heatmapOpacity.value,
-        zIndex: 30
+        zIndex: 999
       });
+      
+      // 强制使用高透明度以确保可见
+      const effectiveOpacity = Math.max(0.9, heatmapOpacity.value);
+      const effectiveRadius = Math.max(60, heatmapRadius.value);
+      
+      console.log('实际使用的配置:', {
+        radius: effectiveRadius,
+        opacity: effectiveOpacity
+      });
+      
+      const heatmap = await createHeatMap(amap.value, mapInstance.value, heatmapData, {
+        radius: effectiveRadius,
+        opacity: effectiveOpacity,
+        zIndex: 9999,  // 最高层级
+        maxOpacity: 1.0,
+        minOpacity: 0.5
+      });
+      
+      console.log('热力图创建结果:', heatmap ? '成功' : '失败');
       
       if (heatmap) {
         heatmapLayer.value = heatmap;
         showHeatMap.value = true;
+        
+        // 检查热力图是否真的在地图上
+        console.log('热力图对象:', heatmap);
+        console.log('热力图 setMap:', typeof heatmap.setMap);
+        console.log('热力图 show:', typeof heatmap.show);
+        console.log('热力图 setData:', typeof heatmap.setData);
+        console.log('热力图 setOptions:', typeof heatmap.setOptions);
+        
+        // 尝试强制显示
+        try {
+          if (typeof heatmap.show === 'function') {
+            heatmap.show();
+            console.log('已调用 heatmap.show()');
+          }
+          
+          // 检查热力图是否关联到地图
+          if (typeof heatmap.getMap === 'function') {
+            console.log('热力图关联的地图:', heatmap.getMap() ? '已关联' : '未关联');
+          }
+          
+          // 尝试将热力图移到最上层
+          if (typeof heatmap.setzIndex === 'function') {
+            heatmap.setzIndex(9999);
+            console.log('已设置热力图 z-index 为 9999');
+          }
+        } catch (e) {
+          console.log('调用显示方法时出错:', e);
+        }
         
         // 添加到图层列表
         const layerId = layerIdCounter.value++;
@@ -3326,8 +4083,8 @@ function toggleHeatMap() {
           id: layerId,
           name: '热力图-' + layerId,
           type: '热力图',
-          radius: heatmapRadius.value,
-          opacity: heatmapOpacity.value,
+          radius: effectiveRadius,
+          opacity: effectiveOpacity,
           instance: heatmap,
           visible: true
         });
@@ -3335,7 +4092,15 @@ function toggleHeatMap() {
         // 默认选中
         checkedLayers.value.push(layerId);
         
-        ElMessage.success('热力图显示成功');
+        console.log('热力图已添加到图层列表，ID:', layerId);
+        ElMessage.success('热力图显示成功，共 ' + heatmapData.length + ' 个数据点，半径:' + effectiveRadius + 'px，透明度:' + Math.round(effectiveOpacity * 100) + '%');
+        
+        // 备用方案：如果高德热力图不显示，添加圆形标记作为可视化
+        console.log('添加备用可视化 - 圆形标记');
+        addHeatmapCircles(heatmapData);
+        
+      } else {
+        ElMessage.error('热力图创建失败，请查看控制台');
       }
     }
   } catch (error) {
@@ -3344,11 +4109,91 @@ function toggleHeatMap() {
   }
 }
 
+// 存储热力图圆形标记的数组
+const heatmapCircles = ref([]);
+
+// 添加热力图圆形标记（备用可视化方案）
+function addHeatmapCircles(data) {
+  // 先清除之前的圆形标记
+  clearHeatmapCircles();
+  
+  if (!mapInstance.value || !amap.value) {
+    console.log('地图未初始化，无法添加圆形标记');
+    return;
+  }
+  
+  console.log('添加 ' + data.length + ' 个圆形标记');
+  
+  // 根据权重值确定颜色
+  function getColorByWeight(weight) {
+    if (weight >= 70) return '#FF0000';      // 红色 - 高密度
+    if (weight >= 50) return '#FF6600';      // 橙色
+    if (weight >= 30) return '#FFCC00';      // 黄色
+    if (weight >= 15) return '#00CC00';      // 绿色
+    if (weight >= 5) return '#0066FF';       // 蓝色
+    return '#0000FF';                         // 深蓝 - 低密度
+  }
+  
+  // 只显示权重较高的点，避免过多标记
+  const significantPoints = data.filter(point => point[2] >= 10);
+  console.log('显著数据点数量:', significantPoints.length);
+  
+  significantPoints.forEach((point, index) => {
+    try {
+      const [lng, lat, weight] = point;
+      const color = getColorByWeight(weight);
+      const radius = Math.max(5000, weight * 800); // 根据权重设置半径（米）
+      
+      const circle = new amap.value.Circle({
+        center: [lng, lat],
+        radius: radius,
+        fillColor: color,
+        fillOpacity: 0.4,
+        strokeColor: color,
+        strokeWeight: 2,
+        strokeOpacity: 0.8,
+        zIndex: 100
+      });
+      
+      circle.setMap(mapInstance.value);
+      heatmapCircles.value.push(circle);
+      
+      if (index < 5) {
+        console.log('添加圆形标记 #' + index, { lng, lat, weight, color, radius });
+      }
+    } catch (e) {
+      console.error('添加圆形标记失败:', e);
+    }
+  });
+  
+  console.log('成功添加 ' + heatmapCircles.value.length + ' 个圆形标记');
+}
+
+// 清除热力图圆形标记
+function clearHeatmapCircles() {
+  console.log('清除 ' + heatmapCircles.value.length + ' 个圆形标记');
+  heatmapCircles.value.forEach(circle => {
+    try {
+      if (circle && typeof circle.setMap === 'function') {
+        circle.setMap(null);
+      }
+    } catch (e) {
+      console.error('清除圆形标记失败:', e);
+    }
+  });
+  heatmapCircles.value = [];
+}
+
 // 生成热力图数据
 function generateHeatmapData() {
   const data = [];
   
+  console.log('开始生成热力图数据...');
+  console.log('迁徙数据数量:', allMigrations.value?.length || 0);
+  console.log('地点数据数量:', locations.value?.length || 0);
+  
   // 从迁徙数据中提取起点和终点
+  let migrationPointCount = 0;
   if (allMigrations && allMigrations.value) {
     allMigrations.value.forEach(migration => {
       if (migration && migration.geometry && migration.geometry.coordinates) {
@@ -3361,6 +4206,7 @@ function generateHeatmapData() {
             coords[0][1],
             3 // 权重
           ]);
+          migrationPointCount++;
         }
         
         // 添加终点
@@ -3370,6 +4216,7 @@ function generateHeatmapData() {
             coords[coords.length - 1][1],
             3 // 权重
           ]);
+          migrationPointCount++;
         }
         
         // 添加途径点
@@ -3380,27 +4227,100 @@ function generateHeatmapData() {
               coords[i][1],
               2 // 途经点权重稍低
             ]);
+            migrationPointCount++;
           }
         }
       }
     });
   }
+  console.log('迁徙路径点数:', migrationPointCount);
   
-  // 从定居点数据中提取点
+  // 从定居点数据中提取点 - 使用 population_estimate 作为权重
+  let locationPointCount = 0;
+  let totalWeight = 0;
   if (locations && locations.value) {
     locations.value.forEach(location => {
       if (location && location.longitude && location.latitude) {
-        const weight = location.type === 'origin' ? 5 : location.type === 'settlement' ? 4 : 2;
+        // 优先使用 population_estimate，如果没有则根据类型使用默认值
+        let weight = 2;
+        if (location.population_estimate && location.population_estimate > 0) {
+          // 将人口数转换为合适的权重值 (1-100 范围)
+          weight = Math.min(100, Math.max(1, Math.round(location.population_estimate / 1000)));
+        } else {
+          // 根据类型使用默认权重
+          weight = location.type === 'origin' ? 50 : location.type === 'settlement' ? 30 : 10;
+        }
+        
         data.push([
           parseFloat(location.longitude),
           parseFloat(location.latitude),
           weight
         ]);
+        locationPointCount++;
+        totalWeight += weight;
       }
     });
   }
+  console.log('地点点数:', locationPointCount);
+  console.log('总权重:', totalWeight);
+  console.log('平均权重:', locationPointCount > 0 ? (totalWeight / locationPointCount).toFixed(2) : 0);
+  console.log('热力图总数据点数:', data.length);
+  
+  // 输出前5个数据点用于调试
+  if (data.length > 0) {
+    console.log('前5个热力图数据点:', data.slice(0, 5));
+  }
   
   return data;
+}
+
+// 刷新热力图（应用新参数）
+function refreshHeatMap() {
+  if (!heatmapLayer.value) {
+    ElMessage.warning('请先显示热力图');
+    return;
+  }
+  
+  console.log('=== 刷新热力图 ===');
+  console.log('新半径:', heatmapRadius.value);
+  console.log('新透明度:', heatmapOpacity.value);
+  
+  try {
+    // 重新生成数据
+    const heatmapData = generateHeatmapData();
+    
+    // 强制使用高透明度以确保可见
+    const effectiveOpacity = Math.max(0.9, heatmapOpacity.value);
+    const effectiveRadius = Math.max(60, heatmapRadius.value);
+    
+    // 更新热力图配置
+    heatmapLayer.value.setOptions({
+      radius: effectiveRadius,
+      opacity: effectiveOpacity,
+      zIndex: 9999,
+      maxOpacity: 1.0,
+      minOpacity: 0.5
+    });
+    
+    // 重新设置数据以应用新配置
+    const maxWeight = heatmapData.length > 0 ? Math.max(...heatmapData.map(item => item[2] || 1)) : 100;
+    heatmapLayer.value.setData({
+      data: heatmapData,
+      max: Math.max(10, Math.ceil(maxWeight * 0.8))
+    });
+    
+    // 更新图层列表中的配置
+    const heatmapLayerItem = addedLayers.value.find(layer => layer.type === '热力图');
+    if (heatmapLayerItem) {
+      heatmapLayerItem.radius = heatmapRadius.value;
+      heatmapLayerItem.opacity = heatmapOpacity.value;
+    }
+    
+    ElMessage.success('热力图已刷新，新配置已应用');
+  } catch (error) {
+    console.error('刷新热力图失败:', error);
+    ElMessage.error('刷新失败: ' + error.message);
+  }
 }
 
 // 移除图层
@@ -3661,7 +4581,7 @@ function exportSelectedLayers() {
   }
 }
 
-// 导出迁移栅格数据
+// 导出迁移栅格数据（增强版）
 function exportMigrationRasterData() {
   if (!allMigrations || !allMigrations.value || allMigrations.value.length === 0) {
     ElMessage.warning('暂无迁移数据可导出');
@@ -3669,42 +4589,233 @@ function exportMigrationRasterData() {
   }
   
   try {
-    // 生成迁移栅格数据
-    const rasterData = generateHeatmapData();
+    // 生成完整的热力图数据（包含详细信息）
+    const rasterData = generateDetailedHeatmapData();
     
     if (!rasterData || rasterData.length === 0) {
       ElMessage.warning('没有足够的数据生成迁移栅格');
       return;
     }
     
-    // 导出为GeoJSON格式
+    // 导出为GeoJSON格式（包含完整属性）
     exportRasterDataAsGeoJSON(rasterData);
     
-    // 导出为CSV格式
+    // 导出为CSV格式（包含完整字段）
     exportRasterDataAsCSV(rasterData);
     
-    ElMessage.success('迁移栅格数据导出成功');
+    // 导出为Excel格式（包含统计信息）
+    exportRasterDataAsExcel(rasterData);
+    
+    ElMessage.success('迁移栅格数据导出成功，共 ' + rasterData.length + ' 条记录');
   } catch (error) {
     console.error('导出迁移栅格数据失败:', error);
-    ElMessage.error('导出迁移栅格数据失败');
+    ElMessage.error('导出迁移栅格数据失败: ' + error.message);
   }
 }
 
-// 将栅格数据导出为GeoJSON格式
+// 生成详细的热力图数据（包含地点和分支信息）
+function generateDetailedHeatmapData() {
+  const data = [];
+  
+  // 从迁徙数据中提取分支信息
+  const branchMap = new Map();
+  if (allMigrations && allMigrations.value) {
+    allMigrations.value.forEach(migration => {
+      if (migration.branch_id && migration.properties) {
+        branchMap.set(migration.branch_id, {
+          id: migration.branch_id,
+          name: migration.properties.branch_name || migration.properties.surname || '未知分支',
+          ancestral_home: migration.properties.ancestral_home || ''
+        });
+      }
+    });
+  }
+  const branchesArray = Array.from(branchMap.values());
+  
+  console.log('生成详细热力图数据...');
+  console.log('迁徙数据数量:', allMigrations.value?.length || 0);
+  console.log('地点数据数量:', locations.value?.length || 0);
+  console.log('分支数据数量:', branchesArray.length);
+  
+  // 1. 从地点数据生成（包含详细信息）
+  if (locations && locations.value) {
+    locations.value.forEach((location, index) => {
+      if (location && location.longitude && location.latitude) {
+        // 查找相关的分支信息（基于祖籍地匹配）
+        const relatedBranches = branchesArray.filter(b => 
+          b.ancestral_home && location.historical_name && 
+          (b.ancestral_home.includes(location.historical_name) || 
+           location.historical_name.includes(b.ancestral_home))
+        ) || [];
+        
+        // 查找相关的迁徙记录
+        const relatedMigrations = allMigrations.value?.filter(m => {
+          return m.from_location_id === location.id || m.to_location_id === location.id;
+        }) || [];
+        
+        // 从相关迁徙中提取关联的分支名称
+        const relatedBranchNames = relatedMigrations.map(m => 
+          m.properties?.branch_name || m.properties?.surname || '未知分支'
+        );
+        const uniqueBranchNames = [...new Set(relatedBranchNames)];
+        
+        // 计算权重
+        let weight = 10; // 基础权重
+        if (location.population_estimate && location.population_estimate > 0) {
+          weight = Math.min(100, Math.max(1, Math.round(location.population_estimate / 1000)));
+        } else {
+          weight = location.type === 'origin' ? 50 : location.type === 'settlement' ? 30 : 10;
+        }
+        
+        data.push({
+          id: `LOC_${location.id}`,
+          type: 'location',
+          longitude: parseFloat(location.longitude),
+          latitude: parseFloat(location.latitude),
+          weight: weight,
+          count: weight,
+          // 地点信息
+          historical_name: location.historical_name,
+          modern_name: location.modern_name,
+          location_type: location.type,
+          admin_region: location.admin_region,
+          population_estimate: location.population_estimate,
+          description: location.description,
+          // 关联信息
+          related_branch_count: uniqueBranchNames.length,
+          related_branches: uniqueBranchNames.join('; '),
+          related_migration_count: relatedMigrations.length,
+          // 时间戳
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+  }
+  
+  // 2. 从迁徙数据生成起点和终点
+  if (allMigrations && allMigrations.value) {
+    allMigrations.value.forEach((migration, index) => {
+      if (migration && migration.geometry && migration.geometry.coordinates) {
+        const coords = migration.geometry.coordinates;
+        const branch = branchMap.get(migration.branch_id) || {
+          name: migration.properties?.branch_name || migration.properties?.surname || '未知分支'
+        };
+        
+        // 添加起点
+        if (coords[0]) {
+          const fromLocation = locations.value?.find(l => l.id === migration.from_location_id);
+          data.push({
+            id: `MIG_${migration.id}_START`,
+            type: 'migration_start',
+            longitude: coords[0][0],
+            latitude: coords[0][1],
+            weight: 15,
+            count: 15,
+            // 迁徙信息
+            migration_id: migration.id,
+            branch_name: branch.name,
+            branch_id: migration.branch_id,
+            period: migration.properties?.period || migration.period,
+            estimated_year: migration.properties?.estimated_year || migration.estimated_year,
+            reason: migration.properties?.migration_reason || migration.reason,
+            key_figure: migration.properties?.key_figure || migration.key_figure,
+            // 地点信息
+            location_name: fromLocation?.historical_name || migration.properties?.from_location || '起点',
+            location_type: 'migration_node',
+            // 关联信息
+            related_branch_count: 1,
+            related_branches: branch.name,
+            related_migration_count: 1,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        // 添加终点
+        if (coords[coords.length - 1]) {
+          const toLocation = locations.value?.find(l => l.id === migration.to_location_id);
+          data.push({
+            id: `MIG_${migration.id}_END`,
+            type: 'migration_end',
+            longitude: coords[coords.length - 1][0],
+            latitude: coords[coords.length - 1][1],
+            weight: 20,
+            count: 20,
+            // 迁徙信息
+            migration_id: migration.id,
+            branch_name: branch.name,
+            branch_id: migration.branch_id,
+            period: migration.properties?.period || migration.period,
+            estimated_year: migration.properties?.estimated_year || migration.estimated_year,
+            reason: migration.properties?.migration_reason || migration.reason,
+            key_figure: migration.properties?.key_figure || migration.key_figure,
+            // 地点信息
+            location_name: toLocation?.historical_name || migration.properties?.to_location || '终点',
+            location_type: 'migration_node',
+            // 关联信息
+            related_branch_count: 1,
+            related_branches: branch.name,
+            related_migration_count: 1,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    });
+  }
+  
+  console.log('生成的详细数据点数:', data.length);
+  return data;
+}
+
+// 将栅格数据导出为GeoJSON格式（包含完整属性）
 function exportRasterDataAsGeoJSON(rasterData) {
   // 创建GeoJSON对象
   const geojson = {
     type: 'FeatureCollection',
+    metadata: {
+      title: '姜姓迁徙热力图数据',
+      description: '包含地点信息、分支关联、迁徙记录等详细数据',
+      generated_at: new Date().toISOString(),
+      total_features: rasterData.length,
+      data_sources: ['locations', 'migrations', 'branches']
+    },
     features: rasterData.map((point, index) => ({
       type: 'Feature',
       geometry: {
         type: 'Point',
-        coordinates: [point[0], point[1]]
+        coordinates: [point.longitude, point.latitude]
       },
       properties: {
-        id: index + 1,
-        count: point[2],
-        weight: point[2]
+        // 基本信息
+        id: point.id || index + 1,
+        type: point.type,
+        count: point.count,
+        weight: point.weight,
+        
+        // 地点信息
+        historical_name: point.historical_name,
+        modern_name: point.modern_name,
+        location_type: point.location_type,
+        admin_region: point.admin_region,
+        population_estimate: point.population_estimate,
+        description: point.description,
+        location_name: point.location_name,
+        
+        // 迁徙信息
+        migration_id: point.migration_id,
+        branch_name: point.branch_name,
+        branch_id: point.branch_id,
+        period: point.period,
+        estimated_year: point.estimated_year,
+        reason: point.reason,
+        key_figure: point.key_figure,
+        
+        // 关联统计
+        related_branch_count: point.related_branch_count,
+        related_branches: point.related_branches,
+        related_migration_count: point.related_migration_count,
+        
+        // 时间戳
+        timestamp: point.timestamp
       }
     }))
   };
@@ -3717,26 +4828,65 @@ function exportRasterDataAsGeoJSON(rasterData) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `migration_raster_${new Date().getTime()}.geojson`;
+  a.download = `jiang_migration_heatmap_${new Date().getTime()}.geojson`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-// 将栅格数据导出为CSV格式
+// 将栅格数据导出为CSV格式（包含完整字段）
 function exportRasterDataAsCSV(rasterData) {
-  // 创建CSV标题行
-  const headers = ['id', 'longitude', 'latitude', 'count', 'weight'];
+  // 创建CSV标题行（包含所有字段）
+  const headers = [
+    'id', 'type', 'longitude', 'latitude', 'count', 'weight',
+    'historical_name', 'modern_name', 'location_type', 'admin_region',
+    'population_estimate', 'description', 'location_name',
+    'migration_id', 'branch_name', 'branch_id', 'period', 'estimated_year',
+    'reason', 'key_figure',
+    'related_branch_count', 'related_branches', 'related_migration_count',
+    'timestamp'
+  ];
   
   // 创建CSV数据行
-  const rows = rasterData.map((point, index) => [
-    index + 1,
-    point[0],
-    point[1],
-    point[2],
-    point[2]
-  ]);
+  const rows = rasterData.map((point, index) => {
+    // 处理可能包含逗号的文本字段
+    const escapeCsv = (text) => {
+      if (text === null || text === undefined) return '';
+      const str = String(text);
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+    
+    return [
+      point.id || index + 1,
+      point.type,
+      point.longitude,
+      point.latitude,
+      point.count,
+      point.weight,
+      escapeCsv(point.historical_name),
+      escapeCsv(point.modern_name),
+      point.location_type,
+      escapeCsv(point.admin_region),
+      point.population_estimate,
+      escapeCsv(point.description),
+      escapeCsv(point.location_name),
+      point.migration_id,
+      escapeCsv(point.branch_name),
+      point.branch_id,
+      escapeCsv(point.period),
+      point.estimated_year,
+      escapeCsv(point.reason),
+      escapeCsv(point.key_figure),
+      point.related_branch_count,
+      escapeCsv(point.related_branches),
+      point.related_migration_count,
+      point.timestamp
+    ];
+  });
   
   // 组合CSV内容
   const csvContent = [
@@ -3744,12 +4894,134 @@ function exportRasterDataAsCSV(rasterData) {
     ...rows.map(row => row.join(','))
   ].join('\n');
   
-  // 创建下载链接
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  // 添加UTF-8 BOM以支持中文
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `migration_raster_${new Date().getTime()}.csv`;
+  a.download = `jiang_migration_heatmap_${new Date().getTime()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// 将栅格数据导出为Excel格式（包含统计信息）
+function exportRasterDataAsExcel(rasterData) {
+  // 准备统计数据
+  const stats = {
+    total_points: rasterData.length,
+    location_points: rasterData.filter(p => p.type === 'location').length,
+    migration_start_points: rasterData.filter(p => p.type === 'migration_start').length,
+    migration_end_points: rasterData.filter(p => p.type === 'migration_end').length,
+    total_weight: rasterData.reduce((sum, p) => sum + (p.weight || 0), 0),
+    avg_weight: (rasterData.reduce((sum, p) => sum + (p.weight || 0), 0) / rasterData.length).toFixed(2),
+    max_weight: Math.max(...rasterData.map(p => p.weight || 0)),
+    min_weight: Math.min(...rasterData.map(p => p.weight || 0))
+  };
+  
+  // 按类型分组统计
+  const typeStats = {};
+  rasterData.forEach(p => {
+    const type = p.type || 'unknown';
+    if (!typeStats[type]) {
+      typeStats[type] = { count: 0, total_weight: 0 };
+    }
+    typeStats[type].count++;
+    typeStats[type].total_weight += p.weight || 0;
+  });
+  
+  // 创建Excel内容（使用HTML表格格式）
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>姜姓迁徙热力图数据</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { color: #333; }
+    h2 { color: #666; margin-top: 30px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #4CAF50; color: white; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+    .stats { background-color: #e7f3fe; padding: 15px; border-radius: 5px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>姜姓迁徙热力图数据报告</h1>
+  <p>生成时间: ${new Date().toLocaleString('zh-CN')}</p>
+  
+  <div class="stats">
+    <h2>统计摘要</h2>
+    <p><strong>总数据点数:</strong> ${stats.total_points}</p>
+    <p><strong>地点数据:</strong> ${stats.location_points}</p>
+    <p><strong>迁徙起点:</strong> ${stats.migration_start_points}</p>
+    <p><strong>迁徙终点:</strong> ${stats.migration_end_points}</p>
+    <p><strong>总权重:</strong> ${stats.total_weight}</p>
+    <p><strong>平均权重:</strong> ${stats.avg_weight}</p>
+    <p><strong>最大权重:</strong> ${stats.max_weight}</p>
+    <p><strong>最小权重:</strong> ${stats.min_weight}</p>
+  </div>
+  
+  <h2>类型分布</h2>
+  <table>
+    <tr>
+      <th>类型</th>
+      <th>数量</th>
+      <th>总权重</th>
+      <th>平均权重</th>
+    </tr>
+    ${Object.entries(typeStats).map(([type, data]) => `
+    <tr>
+      <td>${type}</td>
+      <td>${data.count}</td>
+      <td>${data.total_weight}</td>
+      <td>${(data.total_weight / data.count).toFixed(2)}</td>
+    </tr>
+    `).join('')}
+  </table>
+  
+  <h2>详细数据</h2>
+  <table>
+    <tr>
+      <th>ID</th>
+      <th>类型</th>
+      <th>经度</th>
+      <th>纬度</th>
+      <th>权重</th>
+      <th>历史地名</th>
+      <th>现代地名</th>
+      <th>分支名称</th>
+      <th>时期</th>
+      <th>关联分支数</th>
+    </tr>
+    ${rasterData.map(p => `
+    <tr>
+      <td>${p.id}</td>
+      <td>${p.type}</td>
+      <td>${p.longitude}</td>
+      <td>${p.latitude}</td>
+      <td>${p.weight}</td>
+      <td>${p.historical_name || ''}</td>
+      <td>${p.modern_name || p.location_name || ''}</td>
+      <td>${p.branch_name || ''}</td>
+      <td>${p.period || ''}</td>
+      <td>${p.related_branch_count || 0}</td>
+    </tr>
+    `).join('')}
+  </table>
+</body>
+</html>`;
+  
+  // 创建下载链接
+  const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `jiang_migration_heatmap_${new Date().getTime()}.xls`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -4427,10 +5699,8 @@ function getRouteInfo(migration) {
   left: 0;
   right: 0;
   height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background: #4a5568;
   opacity: 0.95;
-  background-size: 200% 200%;
-  animation: gradientShift 8s ease infinite;
 }
 
 @keyframes gradientShift {
@@ -4497,7 +5767,7 @@ function getRouteInfo(migration) {
   width: 36px;
   height: 36px;
   padding: 0;
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(139, 115, 85, 0.3);
   backdrop-filter: blur(12px);
   border: none;
   border-radius: 10px;
@@ -4510,7 +5780,7 @@ function getRouteInfo(migration) {
 }
 
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(139, 115, 85, 0.6);
   transform: scale(1.15) rotate(90deg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
@@ -4520,6 +5790,48 @@ function getRouteInfo(migration) {
   font-size: 18px;
   font-weight: 600;
   line-height: 1;
+}
+
+/* 头部操作按钮容器 */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 收藏按钮 */
+.favorite-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(12px);
+  border: none;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.favorite-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.favorite-icon {
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1;
+  transition: all 0.3s ease;
+}
+
+.favorite-icon.is-favorite {
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
 }
 
 /* 卡片内容 */
@@ -4868,6 +6180,163 @@ function getRouteInfo(migration) {
   box-shadow: 0 4px 8px rgba(102, 126, 234, 0.15);
 }
 
+/* 收藏面板卡片样式 */
+.favorites-panel-card {
+  position: absolute;
+  top: 100px;
+  right: 30px;
+  z-index: 1001 !important;
+  width: 320px;
+  max-width: calc(100vw - 60px);
+  max-height: calc(100vh - 140px);
+  overflow: hidden;
+}
+
+.favorites-panel-card .card-wrapper {
+  background: linear-gradient(135deg, #ffffff 0%, #fffdf5 100%);
+  border-radius: 16px;
+  box-shadow: 
+    0 16px 48px rgba(255, 183, 0, 0.15),
+    0 0 0 1px rgba(255, 215, 0, 0.2) inset;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.favorites-panel-card .card-wrapper:hover {
+  transform: translateY(-3px);
+  box-shadow: 
+    0 20px 56px rgba(255, 183, 0, 0.2),
+    0 0 0 1px rgba(255, 215, 0, 0.3) inset;
+}
+
+.favorite-gradient {
+  background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%) !important;
+}
+
+.favorite-icon-bg {
+  background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%) !important;
+  box-shadow: 0 4px 12px rgba(255, 183, 0, 0.4) !important;
+}
+
+.empty-favorites {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-favorites p {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.empty-tip {
+  font-size: 12px;
+  color: #999;
+}
+
+.favorites-list {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+}
+
+.favorite-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.favorite-item:hover {
+  background: rgba(255, 248, 220, 0.9);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(255, 183, 0, 0.15);
+  border-color: rgba(255, 215, 0, 0.4);
+}
+
+.favorite-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.favorite-branch-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.branch-icon {
+  font-size: 16px;
+}
+
+.favorite-ancestral-home {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.location-icon {
+  font-size: 12px;
+}
+
+.favorite-time {
+  font-size: 11px;
+  color: #999;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.time-icon {
+  font-size: 10px;
+}
+
+.remove-favorite-btn {
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.favorite-item:hover .remove-favorite-btn {
+  opacity: 1;
+}
+
+.remove-favorite-btn:hover {
+  transform: scale(1.1);
+}
+
+.remove-icon {
+  font-size: 14px;
+}
+
 .comparison-card {
   position: absolute;
   top: 20px;
@@ -5001,6 +6470,111 @@ function getRouteInfo(migration) {
 .cancel-comparison-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+}
+
+/* 收藏浮动按钮样式 - 相对于 background-container 定位 */
+.favorites-float-btn {
+  position: absolute;
+  top: 40px;
+  right: 10%;
+  z-index: 1000;
+  background: linear-gradient(135deg, #ffd700, #ffb700);
+  border-radius: 12px;
+  padding: 10px 12px 10px 16px;
+  box-shadow: 
+    0 4px 16px rgba(255, 183, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  cursor: move;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 183, 0, 0.3);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.favorites-float-btn:active {
+  cursor: grabbing;
+}
+
+.favorites-float-btn:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 
+    0 8px 24px rgba(255, 183, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+}
+
+.favorites-float-btn:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
+/* 拖拽指示器 */
+.drag-indicator {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.3);
+  letter-spacing: 1px;
+  margin-left: 4px;
+  cursor: move;
+}
+
+.drag-indicator:hover {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.favorites-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.favorites-icon {
+  font-size: 20px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.favorites-count {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #ff4757;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 2px 4px rgba(255, 71, 87, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.favorites-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b4513;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* 图例中收藏标记样式 */
+.favorite-marker {
+  background: linear-gradient(135deg, #ffd700, #ffb700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #8b4513;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(255, 183, 0, 0.4);
+}
+
+.legend-item:hover .favorite-marker {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(255, 183, 0, 0.5);
 }
 
 .legend {
@@ -5423,6 +6997,130 @@ function getRouteInfo(migration) {
   background: linear-gradient(135deg, #5568d3, #653a8f);
 }
 
+/* 热力图配置样式 */
+.heatmap-config-item {
+  margin-bottom: 20px;
+}
+
+.heatmap-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.heatmap-icon {
+  font-size: 20px;
+  margin-right: 8px;
+}
+
+.heatmap-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2937;
+}
+
+.config-label {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4B5563;
+  margin-bottom: 8px;
+}
+
+.config-icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+.config-hint {
+  display: block;
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-top: 4px;
+}
+
+/* 图层类型图标 */
+.layer-type-icon {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+/* 按钮图标 */
+.btn-icon {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+/* 图层列表图标 */
+.layer-icon {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+/* 热力图图例样式 */
+.heatmap-legend-item {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #E5E7EB;
+}
+
+.heatmap-legend {
+  width: 100%;
+}
+
+.heatmap-legend-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.heatmap-gradient-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gradient-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #6B7280;
+}
+
+.gradient-label {
+  font-weight: 500;
+}
+
+.gradient-label.high {
+  color: #DC2626;
+}
+
+.gradient-label.medium {
+  color: #F59E0B;
+}
+
+.gradient-label.low {
+  color: #3B82F6;
+}
+
+.gradient-bar {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(to right, 
+    rgba(0, 0, 255, 0.3) 0%,
+    rgba(0, 255, 0, 0.5) 25%,
+    rgba(255, 255, 0, 0.7) 50%,
+    rgba(255, 165, 0, 0.85) 75%,
+    rgba(255, 0, 0, 1) 100%
+  );
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
 /* 起源点标记 - 金色星形 */
 .origin-marker {
   background: #FFD700;
@@ -5757,7 +7455,7 @@ function getRouteInfo(migration) {
 .timeline-container {
   position: fixed;
   left: 0;
-  top: 0;
+  top: 60px;
   bottom: 0;
   width: 420px;
   max-width: 90vw;
@@ -5780,11 +7478,13 @@ function getRouteInfo(migration) {
 
 /* 时间轴头部 */
 .timeline-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #8b7355 0%, #6b5532 100%);
   padding: 24px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
+  min-height: 80px;
 }
 
 .timeline-header::before {
@@ -5922,11 +7622,11 @@ function getRouteInfo(migration) {
 }
 
 .timeline-item.active .timeline-dot {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #8b7355, #6b5532);
   transform: scale(1.4);
   box-shadow: 
-    0 0 0 6px rgba(102, 126, 234, 0.2),
-    0 4px 16px rgba(102, 126, 234, 0.3);
+    0 0 0 6px rgba(139, 115, 85, 0.2),
+    0 4px 16px rgba(139, 115, 85, 0.3);
 }
 
 .timeline-item.active .timeline-dot-ring {
@@ -5960,7 +7660,7 @@ function getRouteInfo(migration) {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid rgba(102, 126, 234, 0.4);
+  border: 2px solid rgba(139, 115, 85, 0.4);
   opacity: 0;
   transition: all 0.3s ease;
 }
@@ -5972,8 +7672,8 @@ function getRouteInfo(migration) {
   width: 3px;
   height: calc(100% - 12px);
   background: linear-gradient(180deg, 
-    rgba(102, 126, 234, 0.2) 0%, 
-    rgba(118, 75, 162, 0.1) 50%,
+    rgba(139, 115, 85, 0.3) 0%, 
+    rgba(107, 85, 50, 0.2) 50%,
     rgba(203, 213, 224, 0.3) 100%);
   border-radius: 2px;
   z-index: 1;
@@ -5997,7 +7697,7 @@ function getRouteInfo(migration) {
   left: 0;
   width: 4px;
   height: 100%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #8b7355, #6b5532);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -6010,8 +7710,8 @@ function getRouteInfo(migration) {
 .timeline-item:hover .timeline-content-wrapper,
 .timeline-item.active .timeline-content-wrapper {
   background: linear-gradient(135deg, #ffffff 0%, #f0f2f5 100%);
-  border-color: rgba(102, 126, 234, 0.3);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.15);
+  border-color: rgba(139, 115, 85, 0.3);
+  box-shadow: 0 6px 20px rgba(139, 115, 85, 0.15);
   transform: translateY(-3px);
 }
 
@@ -6020,11 +7720,11 @@ function getRouteInfo(migration) {
   font-size: 15px;
   font-weight: 700;
   color: #ffffff;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #8b7355, #6b5532);
   padding: 6px 14px;
   border-radius: 20px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(139, 115, 85, 0.3);
   letter-spacing: 0.5px;
 }
 
@@ -6058,11 +7758,11 @@ function getRouteInfo(migration) {
 .route-from,
 .route-to {
   padding: 6px 12px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  background: linear-gradient(135deg, rgba(139, 115, 85, 0.1), rgba(107, 85, 50, 0.1));
   border-radius: 8px;
   font-weight: 500;
   color: #555;
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(139, 115, 85, 0.2);
   transition: all 0.3s ease;
 }
 
@@ -6415,7 +8115,28 @@ function getRouteInfo(migration) {
     max-height: calc(100vh - 160px);
     z-index: 200;
   }
-  
+
+  .favorites-panel-card {
+    position: fixed;
+    top: 70px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100vh - 160px);
+    z-index: 200;
+  }
+
+  .favorites-float-btn {
+    top: 20px;
+    right: 5%;
+    padding: 8px 12px;
+  }
+
+  .favorites-label {
+    display: none;
+  }
+
   .cancel-button-container {
     padding: 10px;
     margin-top: 6px;
@@ -6536,7 +8257,7 @@ function getRouteInfo(migration) {
 
 /* 筛选头部 */
 .filter-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4a5568;
   color: white;
   padding: 0;
   position: relative;
@@ -6711,7 +8432,7 @@ function getRouteInfo(migration) {
 
 /* 地图样式头部 */
 .style-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4a5568;
   color: white;
   padding: 0;
   position: relative;
@@ -7100,7 +8821,7 @@ function getRouteInfo(migration) {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4a5568;
   color: white;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -7190,6 +8911,11 @@ function getRouteInfo(migration) {
 
 .layer-item {
   margin-bottom: 10px;
+  overflow: visible;
+}
+
+.layers-checkbox-group {
+  overflow: visible !important;
 }
 
 .layer-checkbox {
@@ -7201,6 +8927,7 @@ function getRouteInfo(migration) {
   border-radius: 8px;
   transition: all 0.3s ease;
   background: white;
+  overflow: visible;
 }
 
 .layer-checkbox:hover {
@@ -7250,6 +8977,9 @@ function getRouteInfo(migration) {
   display: flex;
   gap: 5px;
   margin-top: 5px;
+  flex-wrap: nowrap;
+  overflow: visible;
+  width: max-content;
 }
 
 .layer-action-btn {
@@ -7337,5 +9067,100 @@ function getRouteInfo(migration) {
 /* 省份选择器样式 */
 .province-selector {
   padding: 10px 0;
+}
+
+/* URL 输入组样式 */
+.url-input-group {
+  margin-bottom: 15px;
+}
+
+.url-examples {
+  margin-top: 8px;
+}
+
+.example-title {
+  display: block;
+  color: #6B7280;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.example-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.example-tag {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.example-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.url-hint {
+  margin-top: 4px;
+  color: #9CA3AF;
+  font-size: 12px;
+}
+
+/* 透明度控制样式 */
+.opacity-control {
+  margin: 15px 0;
+}
+
+.control-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #374151;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* 地理范围配置样式 */
+.bounds-config {
+  margin: 15px 0;
+  padding: 12px;
+  background: #F9FAFB;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.bounds-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.bounds-presets {
+  margin-top: 10px;
+}
+
+.preset-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.preset-tag {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.preset-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* 按钮图标样式 */
+.btn-icon {
+  margin-right: 4px;
 }
 </style>

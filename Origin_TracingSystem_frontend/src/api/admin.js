@@ -289,3 +289,80 @@ export async function reviewMigrationSubmission(submissionId, reviewData) {
     throw new Error(error.response?.data?.message || '审核迁徙口述史提交记录失败')
   }
 }
+
+/**
+ * 获取用户活跃度报表
+ */
+export async function getUserActivityReport(params = {}) {
+  try {
+    const response = await apiClient.get('/api/admin/reports/user-activity', { params })
+    return response.data.data
+  } catch (error) {
+    throw new Error(error.response?.data?.message || '获取用户活跃度报表失败')
+  }
+}
+
+/**
+ * 获取数据增长报表
+ */
+export async function getDataGrowthReport(params = {}) {
+  try {
+    const response = await apiClient.get('/api/admin/reports/data-growth', { params })
+    return response.data.data
+  } catch (error) {
+    throw new Error(error.response?.data?.message || '获取数据增长报表失败')
+  }
+}
+
+/**
+ * 获取审核工作量报表
+ */
+export async function getReviewWorkloadReport(params = {}) {
+  try {
+    const response = await apiClient.get('/api/admin/reports/review-workload', { params })
+    return response.data.data
+  } catch (error) {
+    throw new Error(error.response?.data?.message || '获取审核工作量报表失败')
+  }
+}
+
+/**
+ * 导出报表
+ */
+export async function exportReport(params = {}) {
+  try {
+    const response = await apiClient.get('/api/admin/reports/export', {
+      params,
+      responseType: 'blob'
+    })
+    return response.data
+  } catch (error) {
+    throw new Error(error.response?.data?.message || '导出报表失败')
+  }
+}
+
+/**
+ * 获取密码重置请求列表（管理员）
+ */
+export async function getPasswordResetRequests(status = 'pending') {
+  try {
+    const response = await apiClient.get('/api/admin/password-reset-requests', {
+      params: { status }
+    })
+    return response.data.data
+  } catch (error) {
+    throw new Error(error.response?.data?.message || '获取密码重置请求列表失败')
+  }
+}
+
+/**
+ * 审核密码重置请求（管理员）
+ */
+export async function reviewPasswordResetRequest(requestId, reviewData) {
+  try {
+    const response = await apiClient.post(`/api/admin/password-reset-requests/${requestId}/review`, reviewData)
+    return response.data
+  } catch (error) {
+    throw new Error(error.response?.data?.message || '审核密码重置请求失败')
+  }
+}

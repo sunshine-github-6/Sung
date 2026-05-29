@@ -17,7 +17,6 @@
       </div>
     </div>
 
-    <!-- 数据分析结论模块 -->
     <el-card shadow="hover" class="chart-card conclusion-card">
       <div class="card-title">
         数据分析结论
@@ -44,7 +43,6 @@
       </div>
     </el-card>
 
-    <!-- 历史事件关联分析 -->
     <el-card shadow="hover" class="chart-card">
       <div class="card-title">
         历史事件关联分析

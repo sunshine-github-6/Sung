@@ -3,6 +3,7 @@ import LoginPage from '@/views/LoginPage.vue'
 import MapPage from '@/views/MapPage.vue'
 import AnalyticsPage from '@/views/AnalyticsPage.vue'
 import SubmissionPage from '@/views/SubmissionPage.vue'
+import AdminLayout from '@/layouts/AdminLayout.vue'
 
 const routes = [
   {
@@ -32,8 +33,20 @@ const routes = [
   {
     path: '/admin',
     name: 'Admin',
-    component: () => import('@/views/AdminPage.vue'),
+    component: AdminLayout,
     meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/views/SettingsPage.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/forgot-password',
+    name: 'ForgotPassword',
+    component: () => import('@/views/ForgotPassword.vue'),
+    meta: { requiresAuth: false }
   }
 ]
 
@@ -42,19 +55,15 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫
 router.beforeEach((to, from, next) => {
   const token = sessionStorage.getItem('token')
   const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || '{}')
-  
+
   if (to.meta.requiresAuth && !token) {
-    // 需要登录但未登录，跳转到登录页
     next('/login')
   } else if (to.meta.requiresAdmin && userInfo.role !== 'admin') {
-    // 需要管理员权限但不是管理员
     next('/')
   } else if (to.path === '/login' && token) {
-    // 已登录访问登录页，跳转到首页
     next('/')
   } else {
     next()

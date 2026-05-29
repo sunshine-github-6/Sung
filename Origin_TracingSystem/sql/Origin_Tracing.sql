@@ -1,119 +1,428 @@
--- 创建数据库
-CREATE DATABASE `Origin_Tracing` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `Origin_Tracing`;
+/*
+Navicat MySQL Data Transfer
 
--- 1. 创建家族分支表
-CREATE TABLE `Origin_Tracing_Branches` (
-    `branch_id` INT NOT NULL AUTO_INCREMENT COMMENT '分支ID',
-    `branch_name` VARCHAR(255) NOT NULL COMMENT '分支名称”',
-    `surname` VARCHAR(50) DEFAULT '姜' COMMENT '姓氏',
-    `ancestral_home` VARCHAR(255) COMMENT '祖源地”',
-    `first_ancestor` VARCHAR(255) COMMENT '得姓始祖或开基祖',
-    `historical_summary` TEXT COMMENT '历史摘要',
-    `source_reference` VARCHAR(500) COMMENT '资料来源',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    PRIMARY KEY (`branch_id`),
-    INDEX `idx_branch_name` (`branch_name`(100))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='姜姓家族分支表';
+Source Server         : sun-zhengjiu
+Source Server Version : 80034
+Source Host           : localhost:3306
+Source Database       : origin_tracing
 
--- 2. 创建地理地点表
-CREATE TABLE `Origin_Tracing_Locations` (
-    `location_id` INT NOT NULL AUTO_INCREMENT COMMENT '地点ID',
-    `historical_name` VARCHAR(255) NOT NULL COMMENT '历史地名”',
-    `modern_name` VARCHAR(255) COMMENT '现代地名”',
-    `longitude` DECIMAL(11, 8) COMMENT '经度',
-    `latitude` DECIMAL(10, 8) COMMENT '纬度',
-    `location_type` ENUM('origin', 'settlement', 'node') DEFAULT 'settlement' COMMENT '地点类型：origin起源地，settlement聚居地，node途经地',
-    `admin_region` VARCHAR(255) COMMENT '现代行政区划(省-市-县)',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    PRIMARY KEY (`location_id`),
-    INDEX `idx_historical_name` (`historical_name`(100)),
-    INDEX `idx_coordinates` (`longitude`, `latitude`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='祖籍地与迁徙地点表';
+Target Server Type    : MYSQL
+Target Server Version : 80034
+File Encoding         : 65001
 
--- 3. 创建迁徙事件表
-CREATE TABLE `Origin_Tracing_Migrations` (
-    `migration_id` INT NOT NULL AUTO_INCREMENT COMMENT '迁徙ID',
-    `branch_id` INT NOT NULL COMMENT '关联的分支ID',
-    `from_location_id` INT NOT NULL COMMENT '迁出地ID',
-    `to_location_id` INT NOT NULL COMMENT '迁入地ID',
-    `migration_period` VARCHAR(100) COMMENT '迁徙年代',
-    `estimated_year` INT COMMENT '估算年份',
-    `migration_reason` TEXT COMMENT '迁徙原因',
-    `key_figure` VARCHAR(255) COMMENT '关键人物',
-    `description` TEXT COMMENT '事件详细描述',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    PRIMARY KEY (`migration_id`),
-    FOREIGN KEY (`branch_id`) REFERENCES `Origin_Tracing_Branches`(`branch_id`) ON DELETE CASCADE,
-    FOREIGN KEY (`from_location_id`) REFERENCES `Origin_Tracing_Locations`(`location_id`),
-    FOREIGN KEY (`to_location_id`) REFERENCES `Origin_Tracing_Locations`(`location_id`),
-    INDEX `idx_branch` (`branch_id`),
-    INDEX `idx_period` (`migration_period`(50)),
-    INDEX `idx_year` (`estimated_year`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='姜姓家族迁徙事件表';
+Date: 2026-05-29 14:25:32
+*/
 
--- 4. 创建用户表
-CREATE TABLE `Origin_Tracing_Users` (
-    `user_id` INT NOT NULL AUTO_INCREMENT COMMENT '用户ID',
-    `username` VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
-    `password_hash` VARCHAR(255) NOT NULL COMMENT '密码哈希',
-    `role` ENUM('user', 'admin') DEFAULT 'user' COMMENT '角色: user-普通用户, admin-管理员',
-    `real_name` VARCHAR(50) COMMENT '真实姓名',
-    `phone` VARCHAR(20) COMMENT '联系电话',
-    `is_active` BOOLEAN DEFAULT TRUE COMMENT '是否激活',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
-    `last_login` TIMESTAMP NULL COMMENT '最后登录时间',
-    PRIMARY KEY (`user_id`),
-    INDEX `idx_username` (`username`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统用户表';
+SET FOREIGN_KEY_CHECKS=0;
 
--- 5. 创建用户提交的迁徙口述史表
-CREATE TABLE `Origin_Tracing_Migration_Submissions` (
-    `submission_id` INT NOT NULL AUTO_INCREMENT COMMENT '提交ID',
-    `user_id` INT NOT NULL COMMENT '提交用户ID',
-    `branch_name` VARCHAR(255) NOT NULL COMMENT '分支名称',
-    `surname` VARCHAR(50) DEFAULT '姜' COMMENT '姓氏',
-    `migration_description` TEXT NOT NULL COMMENT '迁徙口述史描述',
-    `migration_period` VARCHAR(100) COMMENT '迁徙年代',
-    `estimated_year` INT COMMENT '估算年份',
-    `migration_route` TEXT COMMENT '迁徙路线描述（JSON格式）',
-    `migration_reason` TEXT COMMENT '迁徙原因',
-    `key_figures` TEXT COMMENT '关键人物',
-    `source_reference` VARCHAR(500) COMMENT '资料来源',
-    `status` ENUM('pending', 'approved', 'rejected') DEFAULT 'pending' COMMENT '审核状态：pending待审核，approved已批准，rejected已拒绝',
-    `reviewer_id` INT NULL COMMENT '审核员ID',
-    `review_comment` TEXT COMMENT '审核意见',
-    `submitted_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
-    `reviewed_at` TIMESTAMP NULL COMMENT '审核时间',
-    PRIMARY KEY (`submission_id`),
-    FOREIGN KEY (`user_id`) REFERENCES `Origin_Tracing_Users`(`user_id`) ON DELETE CASCADE,
-    FOREIGN KEY (`reviewer_id`) REFERENCES `Origin_Tracing_Users`(`user_id`) ON DELETE SET NULL,
-    INDEX `idx_status` (`status`),
-    INDEX `idx_user_id` (`user_id`),
-    INDEX `idx_submitted_at` (`submitted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户提交的迁徙口述史表';
+-- ----------------------------
+-- Table structure for branches
+-- ----------------------------
+DROP TABLE IF EXISTS `branches`;
+CREATE TABLE `branches` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT '分支ID',
+  `name` varchar(255) NOT NULL COMMENT '分支名称',
+  `surname` varchar(50) DEFAULT '姜' COMMENT '姓氏',
+  `ancestral_home` varchar(255) DEFAULT NULL COMMENT '祖源地',
+  `first_ancestor` varchar(255) DEFAULT NULL COMMENT '得姓始祖或开基祖',
+  `historical_summary` text COMMENT '历史摘要',
+  `source_reference` varchar(500) DEFAULT NULL COMMENT '资料来源',
+  `celebrity_info` json DEFAULT NULL COMMENT '名人信息JSON数组',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_name` (`name`(100))
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='姜姓家族分支表';
 
--- 6. 创建用户提交的私家族谱摘要表
-CREATE TABLE `Origin_Tracing_Family_Tree_Submissions` (
-    `submission_id` INT NOT NULL AUTO_INCREMENT COMMENT '提交ID',
-    `user_id` INT NOT NULL COMMENT '提交用户ID',
-    `branch_name` VARCHAR(255) NOT NULL COMMENT '分支名称',
-    `surname` VARCHAR(50) DEFAULT '姜' COMMENT '姓氏',
-    `family_tree_summary` TEXT NOT NULL COMMENT '族谱摘要',
-    `ancestral_home` VARCHAR(255) COMMENT '祖源地',
-    `first_ancestor` VARCHAR(255) COMMENT '始祖信息',
-    `generation_info` TEXT COMMENT '世代信息（JSON格式）',
-    `key_descendants` TEXT COMMENT '关键后裔',
-    `source_reference` VARCHAR(500) COMMENT '资料来源',
-    `status` ENUM('pending', 'approved', 'rejected') DEFAULT 'pending' COMMENT '审核状态：pending待审核，approved已批准，rejected已拒绝',
-    `reviewer_id` INT NULL COMMENT '审核员ID',
-    `review_comment` TEXT COMMENT '审核意见',
-    `submitted_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
-    `reviewed_at` TIMESTAMP NULL COMMENT '审核时间',
-    PRIMARY KEY (`submission_id`),
-    FOREIGN KEY (`user_id`) REFERENCES `Origin_Tracing_Users`(`user_id`) ON DELETE CASCADE,
-    FOREIGN KEY (`reviewer_id`) REFERENCES `Origin_Tracing_Users`(`user_id`) ON DELETE SET NULL,
-    INDEX `idx_status` (`status`),
-    INDEX `idx_user_id` (`user_id`),
-    INDEX `idx_submitted_at` (`submitted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户提交的私家族谱摘要表';
+-- ----------------------------
+-- Records of branches
+-- ----------------------------
+INSERT INTO `branches` VALUES ('1', '源流始祖分支', '姜', '姜水流域', '炎帝神农氏、姜子牙(吕尚)', '最古老的姜姓起源。炎帝神农氏因居于姜水而得姓。至商末周初，姜姓后裔姜子牙辅佐周文王、武王灭商，受封于齐，建立齐国，成为姜姓发展史上最辉煌的篇章。', '《国语·晋语》《史记·齐太公世家》', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('2', '天水郡姜氏（郡望）', '姜', '天水郡', '姜伯约（姜维）等', '天水郡是姜姓最负盛名的郡望，在秦汉至魏晋时期形成。关东姜姓西迁至陇西天水一带，形成名门望族。后世天下姜姓多出于此或溯源于此。', '《元和姓纂》、《新唐书·宰相世系表》', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('3', '赣湘鄂姜氏（志模公系）', '姜', '江西瑞昌等', '姜志模', '明清时期活跃于江西、湖北、湖南交界地区的姜姓大宗，谱系记载详尽。后裔以江西瑞昌为中心，向湖北阳新、大冶、武昌及湖南平江等地扩散。', '《姜氏统宗谱》、《姜氏宗谱》', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('4', '湖南宁乡黄材姜氏', '姜', '江西吉州泰和', '姜德厚（字流光）', '始祖姜德厚于五代后唐同光二年（924年）从江西迁至湖南宁乡黄材，落籍姜坊，开基立业，成为当地望族。', '清光绪《宁乡姜姓重修族谱》', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('5', '台湾新竹北埔姜氏（天水堂）', '姜', '广东惠州陆丰', '姜朝凤（渡台祖）', '清代渡海来台的姜姓代表。乾隆年间，姜朝凤自广东渡海来台，其孙姜秀峦成为新竹北埔垦殖领袖，并兴建\"天水堂\"祖屋。', '《北埔姜氏族谱》、北埔天水堂史料', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('6', '长沙分支', '姜', '湖南长沙', '姜氏开基祖（名讳失考）', '湖南长沙地区的姜姓支系。', '《姜氏三修支谱》（清光绪十九年）', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('7', '丹徒分支', '姜', '江苏丹徒', '姜氏开基祖（名讳失考）', '江苏丹徒（今属常州）地区的姜姓支系。', '《毘陵姜氏宗谱》（清光绪六年）', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('8', '兰溪分支', '姜', '浙江兰溪', '姜氏开基祖（名讳失考）', '浙江兰溪地区的姜姓支系，传承久远。', '《重修后塘姜氏宗谱》（明嘉靖二年）', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('9', '鄞县分支', '姜', '浙江鄞县', '姜氏开基祖（名讳失考）', '浙江鄞县（今宁波）地区的姜姓支系。', '《姜氏世谱》（清光绪二十年）', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('10', '莱阳分支', '姜', '山东莱阳', '姜氏开基祖（名讳失考）', '山东莱阳地区的姜姓支系。', '《姜氏祖谱》（清光绪二十六年）', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('11', '天津分支', '姜', '天津', '姜氏开基祖（名讳失考）', '天津地区的姜姓支系，体现近代城市化扩散。', '《姜氏家谱》（民国十八年）', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('12', '湖南新化姜氏 (发隆公系)', '姜', '江西抚州崇仁县', '姜发隆', '始迁祖姜发隆于元代为避战乱，从江西抚州崇仁县迁至湖南新化县，为该支开基祖。', '《姜姓续修族谱》', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('13', '湖北武昌姜氏 (顺三公系)', '姜', '江西袁州萍乡县', '姜顺三', '宗祖姜顺三原籍江西袁州萍乡县，后官迁至湖北武昌县，家族于此定居发展。', '《姜氏宗谱》', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('14', '辽宁庄河姜氏 (可任公系)', '姜', '山东登州黄县', '姜可任', '清代，第四世祖姜可任携家族从山东登州府黄县迁至辽宁奉天府庄河厅，属典型的\"闯关东\"移民。', '《姜氏家谱》(庄河)', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('15', '浙江江山姜氏 (开化迁江山系)', '姜', '浙江衢州开化县', '姜氏迁江山始祖', '该支姜氏较早从衢州府内开化县迁至江山县定居，属区域性扩散。', '地方志及族谱记载', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('16', '山东沾化姜氏', '姜', '山东高密', '姜佐（始迁祖）', '明洪武二年（1369年），始祖自山东高密迁居渤海西岸沾化县，后裔分布于冀鲁边区120余个村落，现存约5万人。族谱五修，脉络清晰。', '《沾化姜氏族谱》（2013年五修版）', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('17', '山东昌邑姜氏', '姜', '山东东牟宁海彤岭、黄城阳', '不详（分两次迁入）', '昌邑姜姓为地方望族，有\"昌邑县，姜一半\"之说。分两支：北宋靖康年间自东牟宁海迁入；元代中叶自黄城阳迁入。清代建有规模宏大的姜氏祠堂。', '《昌邑姜氏族谱》、昌邑文史资料', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('18', '浙江乐清姜氏（下湾/姜氏房谱）', '姜', '浙江乐清', '姜氏先祖（具体名讳待考）', '浙江乐清地区的姜姓支系，有民国二十九年《重修下湾姜氏房谱》、民国八年《重修姜氏房谱》等谱牒存世，传承有序。', '温州市图书馆-家谱中心', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('19', '湖北/四川/福建稼穑堂姜氏', '姜', '不详', '姜氏先祖（具体名讳待考）', '福建漳州地区的姜姓支系，始祖姜世良于明洪武年间在福建漳州龙溪红豆村发迹。清乾隆年间，其第十一世孙渡海赴台，成为开台祖。', '姜姓百度百科-堂号', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('20', '湘阴姜氏（天水堂）', '姜', '湖南湘阴', '姜松年（后周）', '湖南湘阴地区姜姓，尊后周姜松年为始祖，堂号为\"天水堂\"，是姜姓重要郡望的延续。', '姜姓百度百科-堂号', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('21', '江苏姜堰姜氏', '姜', '江苏句容', '伯六（姜伯六）', '北宋时期，迁始祖伯六（姜伯六）从江南句容迁至姜堰（原名三水），地名与姓氏融合，成为当地望族。', '地方文史资料', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('22', '浙江淳安姜氏', '姜', '浙江丽水', '姜氏迁淳安始祖', '该支姜氏较早从丽水地区迁至淳安县定居，属于浙江省内的区域性扩散与开发。', '地方志及谱牒记载', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('23', '台湾彰化姜氏（天水堂）', '姜', '广东长乐（五华）', '姜仕俊', '清乾隆末年，姜仕俊率族人从广东嘉应州长乐县渡海来台，入垦彰化芬园、员林一带，堂号为\"天水堂\"。', '《台湾区姓氏堂号考》', null, '2026-01-17 21:53:47', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('24', '皖浙新安江流域姜氏 (孝子大民公派)', '姜', '徽州府歙县（新安江上游）', '大民公（孝子）', '宋元以来，姜氏\"孝子大民公\"一派从徽州府歙县向严州府淳安、建德等地迁徙。主要沿新安江水路，途经深渡、街口、威坪等重要集镇，形成跨省连县的宗族网络。', '《地方文化研究》2024(03)', null, '2026-01-18 11:57:52', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('25', '山东乳山万户姜氏', '姜', '山东乳山万户', '姜房', '姜太公后裔。至少于南宋初年已定居于山东乳山万户村。金元之际，姜房因组织乡勇平定地方匪患、安抚百姓有功，官至总管万户，封天水郡开国侯。', '《村名印迹｜乳山市大孤山镇万户村》', null, '2026-01-18 11:57:52', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('26', '浙江温州沙南姜氏 (门前姜)', '姜', '浙江温州永强沙村', '罗菴公', '明弘治年间，始祖罗菴公从瑞安五都东溪迁至永强沙村定居，生十子分十房，繁衍至今已五百余年。', '《沙背之南的沙南村》，温州网', null, '2026-01-18 11:57:52', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('27', '胶东平度姜氏', '姜', '青州朱柳', '二公', '明初奉命自青州朱柳迁至胶水（平度）定居，世称\"衙门口姜氏\"。后裔在平度境内分迁频繁，形成众多支派。', '《胶东姜氏》百度百科', null, '2026-01-18 14:54:16', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('28', '江西都昌姜氏', '姜', '江苏镇江宁海（古润州）', '姜朝泰', '晋代一世祖姜朝泰自江苏宁海官迁至江西鄱阳，后裔定居都昌，派系繁多，是赣北姜姓的重要支系。', '《姜氏宗谱》著录信息', null, '2026-01-18 14:54:16', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('29', '韩国胶东姜氏（己其公族后裔）', '姜', '山东半岛（胶东地区）', '己其公族', '该支系为商周时期山东古国\"己其\"（姜姓）公族后裔。自汉代起，其中一部分从山东半岛跨海迁至朝鲜半岛，在韩国繁衍至今。', '23魔方基因研究及相关论文', null, '2026-01-18 14:54:16', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('30', '浙江慈溪姜氏（湖山系）', '姜', '慈溪横山', '姜仁普、姜仁和', '北宋时，姜仁普、姜仁和兄弟自慈溪横山迁至湖山、大山一带定居，为湖山姜氏始祖。', '《慈溪姜氏湖山宗谱》', null, '2026-01-18 14:59:45', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('31', '湖南邵阳姜氏（福五郎系）', '姜', '泰和鹅颈大丘', '姜福五郎', '元至正年间，姜福五郎自江西泰和鹅颈大丘迁至湖南邵阳县东乡，为当地开基祖，是\"江西填湖广\"移民潮中的姜姓代表。', '湖南邵东姜氏族谱资料', null, '2026-01-18 14:59:45', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('32', '四川富顺姜氏（湖广填川系）', '姜', '永州零陵', '姜仕凤', '清康熙年间，姜仕凤率族人自湖南永州零陵入川，落业于富顺县下北乡，是\"湖广填四川\"运动中姜姓家族的典型。', '《姜氏族谱》（富顺）', null, '2026-01-18 14:59:45', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('33', '江苏泰兴姜氏', '姜', '苏州闾门', '姜仁三', '明洪武年间，姜仁三自苏州闾门迁至泰兴东乡开基，属\"洪武赶散\"移民。后裔众多，分迁泰兴、如皋等地。', '《姜氏宗谱》（泰兴）', null, '2026-01-18 14:59:45', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('34', '贵州天柱姜氏（渡马乡）', '姜', '靖州远口', '姜世杰、姜世豪', '明末清初，姜世杰、姜世豪兄弟为谋生计，从湖南靖州远口迁至贵州天柱县渡马乡定居，后裔融入当地苗侗社会。', '天柱县渡马乡姜氏族谱及口述史', null, '2026-01-18 14:59:45', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('35', '湖北蕲春姜氏（受一公系）', '姜', '瓦屑坝', '姜受一', '明洪武年间，姜受一自江西饶州瓦屑坝迁至湖北蕲州（今蕲春），为当地开基祖。瓦屑坝是著名的明代移民集散地。', '湖北蕲春姜氏族谱资料', null, '2026-01-18 14:59:45', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('36', '广东化州姜氏', '姜', '福建莆田珠玑巷', '姜万一郎', '宋末元初，姜万一郎由福建莆田珠玑巷迁徙至高州府化州，开基立业，为化州姜氏始祖。', '《化州县志》、《姜氏族谱》', null, '2026-01-18 15:04:06', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('37', '广东英德姜氏', '姜', '韶州府乳源县', '姜天富', '明代，姜天富自韶州府乳源县迁至同府的英德县定居，属于同一行政区内的扩散性迁徙。', '地方谱牒资料', null, '2026-01-18 15:04:06', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('38', '广西全州绕龙水姜氏', '姜', '江西临江府清江县', '姜必祖', '明洪武二年，姜必祖从江西清江鹅公坵从军至广西，后落籍于桂林府全州县永岁镇绕龙水村。', '全州地方文史资料及族谱', null, '2026-01-18 15:04:06', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('39', '广西全州万板桥姜氏', '姜', '广西兴安县下塘村', '姜宗杓', '该支系先祖原籍江西，辗转湖南、广西。清乾隆元年，姜宗杓由广西兴安县下塘村迁至全州县蕉江乡万板桥村定居。', '全州地方文史资料及族谱', null, '2026-01-18 15:04:06', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('40', '甘肃民勤姜氏（庆一公系）', '姜', '浙江金华', '姜庆一、姜庆二', '明洪武十七年，姜庆一、姜庆二兄弟自浙江金华府迁至甘肃镇番卫（今民勤县）定居。现代基因研究证实了该家族的独立谱系。', '23魔方基因家族研究《甘肃民勤姜氏家族》', null, '2026-01-18 15:09:41', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('41', '陕西永寿姜家村姜氏', '姜', '山西洪洞', '姜懋德', '明末清初，社会动荡，姜懋德携家人自山西洪洞大槐树迁至陕西永寿县北部，依崖凿窑，建立姜家村。', '咸阳市政府官网《村镇史话：薪火相传姜家村》', null, '2026-01-18 15:12:51', '2026-03-17 23:08:59');
+INSERT INTO `branches` VALUES ('42', '云南昭通姜氏（姜亮夫家族）', '姜', '南京柳树湾', '姜汇、姜润、姜正荣', '该支姜氏为著名国学大师姜亮夫先生家族。明洪武年间，先祖随沐英征滇，以军功入籍云南。清初，一世祖姜正荣由陆良镇守昭通，遂为昭通望族。', '学术文献《姜亮夫家世渊源与昭通地方社会转型关系考略》', null, '2026-01-18 15:12:51', '2026-03-17 23:08:59');
+
+-- ----------------------------
+-- Table structure for locations
+-- ----------------------------
+DROP TABLE IF EXISTS `locations`;
+CREATE TABLE `locations` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT '地点ID',
+  `historical_name` varchar(255) NOT NULL COMMENT '历史地名',
+  `modern_name` varchar(255) DEFAULT NULL COMMENT '现代地名',
+  `longitude` decimal(11,8) DEFAULT NULL COMMENT '经度',
+  `latitude` decimal(10,8) DEFAULT NULL COMMENT '纬度',
+  `type` enum('origin','settlement','node') DEFAULT 'settlement' COMMENT '地点类型',
+  `admin_region` varchar(255) DEFAULT NULL COMMENT '现代行政区划',
+  `population_estimate` int DEFAULT NULL COMMENT '姜姓人口估算',
+  `description` text COMMENT '地点描述',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_historical_name` (`historical_name`(100)),
+  KEY `idx_coordinates` (`longitude`,`latitude`)
+) ENGINE=InnoDB AUTO_INCREMENT=98 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='地理地点表';
+
+-- ----------------------------
+-- Records of locations
+-- ----------------------------
+INSERT INTO `locations` VALUES ('1', '姜水', '陕西省宝鸡市附近（渭河支流）', '107.24000000', '34.36000000', 'origin', '陕西省-宝鸡市', '100', null, '2026-01-17 21:53:47', '2026-03-18 12:21:52');
+INSERT INTO `locations` VALUES ('2', '营丘', '山东省淄博市临淄区', '118.30000000', '36.86000000', 'settlement', '山东省-淄博市', '95', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('3', '天水郡', '甘肃省天水市及通渭县一带', '105.72000000', '34.58000000', 'settlement', '甘肃省-天水市', '90', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('4', '成都', '四川省成都市', '104.06000000', '30.66000000', 'settlement', '四川省-成都市', '35', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('5', '兰溪', '浙江省金华市兰溪市', '119.46000000', '29.21000000', 'settlement', '浙江省-金华市', '45', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('6', '瑞昌', '江西省九江市瑞昌市', '115.68000000', '29.68000000', 'settlement', '江西省-九江市', '35', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('7', '兴国州（阳新）', '湖北省黄石市阳新县', '115.22000000', '29.83000000', 'settlement', '湖北省-黄石市', '35', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('8', '平江', '湖南省岳阳市平江县', '113.58000000', '28.70000000', 'settlement', '湖南省-岳阳市', '40', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('9', '吉州泰和', '江西省吉安市泰和县', '114.88000000', '26.80000000', 'settlement', '江西省-吉安市', '32', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('10', '宁乡黄材姜坊', '湖南省长沙市宁乡市黄材镇', '111.99000000', '28.18000000', 'settlement', '湖南省-长沙市-宁乡市', '50', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('11', '广东惠州陆丰', '广东省汕尾市陆丰市', '115.64000000', '22.95000000', 'settlement', '广东省-汕尾市', '20', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('12', '北埔', '台湾省新竹县北埔乡', '121.06000000', '24.70000000', 'settlement', '台湾省-新竹县', '30', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('13', '汉中', '陕西省汉中市', '107.02000000', '33.07000000', 'node', '陕西省-汉中市', '45', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('14', '通山', '湖北省咸宁市通山县', '114.52000000', '29.60000000', 'node', '湖北省-咸宁市', '30', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('15', '萍乡', '江西省萍乡市', '113.85000000', '27.63000000', 'node', '江西省-萍乡市', '15', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('16', '厦门', '福建省厦门市', '118.09000000', '24.48000000', 'node', '福建省-厦门市', '12', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('17', '湘阴', '湖南省岳阳市湘阴县', '112.90000000', '28.68000000', 'settlement', '湖南省-岳阳市', '35', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('18', '长沙', '湖南省长沙市', '112.94000000', '28.23000000', 'settlement', '湖南省-长沙市', '45', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('19', '丹徒', '江苏省镇江市丹徒区', '119.43000000', '32.13000000', 'settlement', '江苏省-镇江市', '50', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('20', '兰溪后塘', '浙江省金华市兰溪市', '119.46000000', '29.21000000', 'settlement', '浙江省-金华市', '42', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('21', '鄞县', '浙江省宁波市鄞州区', '121.55000000', '29.81000000', 'settlement', '浙江省-宁波市', '40', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('22', '莱阳', '山东省烟台市莱阳市', '120.71000000', '36.98000000', 'settlement', '山东省-烟台市', '70', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('23', '天津', '天津市', '117.20000000', '39.13000000', 'settlement', '天津市', '30', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('24', '崇仁', '江西省抚州市崇仁县', '116.06000000', '27.76000000', 'settlement', '江西省-抚州市', '30', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('25', '新化', '湖南省娄底市新化县', '111.33000000', '27.73000000', 'settlement', '湖南省-娄底市', '32', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('26', '武昌', '湖北省武汉市武昌区', '114.32000000', '30.55000000', 'settlement', '湖北省-武汉市', '40', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('27', '登州黄', '山东省烟台市龙口市', '120.33000000', '37.65000000', 'settlement', '山东省-烟台市', '40', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('28', '庄河厅', '辽宁省大连市庄河市', '122.97000000', '39.70000000', 'settlement', '辽宁省-大连市', '60', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('29', '开化', '浙江省衢州市开化县', '118.41000000', '29.14000000', 'settlement', '浙江省-衢州市', '10', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('30', '江山', '浙江省衢州市江山市', '118.62000000', '28.74000000', 'settlement', '浙江省-衢州市', '38', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('31', '高密', '山东省潍坊市高密市', '119.75560000', '36.38260000', 'settlement', '山东省-潍坊市', '60', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('32', '沾化', '山东省滨州市沾化区', '118.12990000', '37.69090000', 'settlement', '山东省-滨州市', '85', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('33', '昌邑', '山东省潍坊市昌邑市', '119.39890000', '36.85880000', 'settlement', '山东省-潍坊市', '80', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('34', '东牟宁海彤岭', '山东省烟台市牟平区或附近', '121.60000000', '37.38700000', 'settlement', '山东省-烟台市', '65', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('35', '黄城阳', '山东省青岛市即墨区或附近', '120.45000000', '36.38000000', 'settlement', '山东省-青岛市', '65', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('36', '乐清下湾', '浙江省温州市乐清市', '120.96750000', '28.11650000', 'settlement', '浙江省-温州市', '35', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('37', '龙溪县红豆村', '福建省漳州市龙溪县（古地名）', '117.65000000', '24.51000000', 'settlement', '福建省-漳州市', '25', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('38', '澎湖岐头社', '台湾省澎湖县白沙乡岐头村', '119.58000000', '23.66000000', 'settlement', '台湾省-澎湖县', '15', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('39', '姑苏', '江苏省苏州市', '120.58500000', '31.30000000', 'settlement', '江苏省-苏州市', '55', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('40', '郯城', '山东省临沂市郯城县', '118.34000000', '34.61000000', 'settlement', '山东省-临沂市', '45', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('41', '句容', '江苏省镇江市句容市', '119.16800000', '31.94400000', 'settlement', '江苏省-镇江市', '45', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('42', '合肥东乡浮槎山', '安徽省合肥市肥东县（浮槎山附近）', '117.47000000', '31.88000000', 'settlement', '安徽省-合肥市', '40', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('43', '姜堰', '江苏省泰州市姜堰区', '120.12700000', '32.50900000', 'settlement', '江苏省-泰州市', '45', null, '2026-01-17 21:53:47', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('44', '丽水', '浙江省丽水市', '119.92000000', '28.45000000', 'settlement', '浙江省-丽水市', '28', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('45', '淳安', '浙江省杭州市淳安县', '119.04200000', '29.60000000', 'settlement', '浙江省-杭州市', '25', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('46', '长乐县', '广东省梅州市五华县', '115.77000000', '23.93000000', 'settlement', '广东省-梅州市', '18', null, '2026-01-17 21:53:47', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('47', '彰化芬园', '台湾省彰化县芬园乡', '120.63000000', '24.02000000', 'settlement', '台湾省-彰化县', '20', null, '2026-01-17 21:53:47', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('49', '万户村', '山东省威海市乳山市大孤山镇万户村', '121.52000000', '36.90000000', 'settlement', '山东省-威海市-乳山市', '75', null, '2026-01-18 11:57:52', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('50', '瑞安五都东溪', '浙江省温州市瑞安市下辖原五都东溪', '120.65000000', '27.78000000', 'settlement', '浙江省-温州市-瑞安市', '32', null, '2026-01-18 11:57:52', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('51', '永强沙村', '浙江省温州市龙湾区沙南村', '120.80000000', '27.85000000', 'settlement', '浙江省-温州市-龙湾区', '30', null, '2026-01-18 11:57:52', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('52', '青州朱柳', '山东省潍坊市青州市（古朱柳村）', '118.47000000', '36.68000000', 'settlement', '山东省-潍坊市', '55', null, '2026-01-18 14:54:16', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('53', '胶水县署前', '山东省青岛市平度市（旧县署东侧）', '119.96000000', '36.79000000', 'settlement', '山东省-青岛市', '50', null, '2026-01-18 14:54:16', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('54', '润州宁海荷叶山', '江苏省镇江市一带（古宁海县）', '119.43000000', '32.20000000', 'settlement', '江苏省-镇江市', '40', null, '2026-01-18 14:54:16', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('55', '饶州鄱阳', '江西省上饶市鄱阳县', '116.67000000', '29.00000000', 'settlement', '江西省-上饶市', '28', null, '2026-01-18 14:54:16', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('56', '朝鲜半岛', '朝鲜半岛（今韩国、朝鲜）', '127.76690000', '39.03890000', 'settlement', '海外', '40', null, '2026-01-18 14:54:16', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('57', '慈溪横山', '浙江省宁波市慈溪市横山一带', '121.35000000', '30.19000000', 'settlement', '浙江省-宁波市', '35', null, '2026-01-18 14:59:45', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('58', '慈溪湖山', '浙江省宁波市慈溪市湖山村、大山村', '121.38000000', '30.21000000', 'settlement', '浙江省-宁波市', '32', null, '2026-01-18 14:59:45', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('59', '泰和鹅颈大丘', '江西省吉安市泰和县（古称，泛指）', '114.88000000', '26.80000000', 'settlement', '江西省-吉安市', '22', null, '2026-01-18 14:59:45', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('60', '邵阳东乡', '湖南省邵阳市邵东市（旧邵阳县东乡）', '111.70000000', '27.20000000', 'settlement', '湖南省-邵阳市', '30', null, '2026-01-18 14:59:45', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('61', '永州零陵', '湖南省永州市零陵区', '111.62000000', '26.23000000', 'settlement', '湖南省-永州市', '28', null, '2026-01-18 14:59:45', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('62', '富顺下北乡', '四川省自贡市富顺县（旧下北乡）', '105.00000000', '29.18000000', 'settlement', '四川省-自贡市', '22', null, '2026-01-18 14:59:45', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('63', '苏州闾门', '江苏省苏州市阊门一带', '120.61000000', '31.32000000', 'settlement', '江苏省-苏州市', '50', null, '2026-01-18 14:59:45', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('64', '泰兴东乡', '江苏省泰州市泰兴市东部地区', '120.10000000', '32.20000000', 'settlement', '江苏省-泰州市', '38', null, '2026-01-18 14:59:45', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('65', '靖州远口', '湖南省怀化市靖州苗族侗族自治县远口镇', '109.68000000', '26.57000000', 'settlement', '湖南省-怀化市', '8', null, '2026-01-18 14:59:45', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('66', '天柱渡马', '贵州省黔东南州天柱县渡马乡', '109.30000000', '26.95000000', 'settlement', '贵州省-黔东南州', '10', null, '2026-01-18 14:59:45', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('67', '瓦屑坝', '江西省上饶市鄱阳县瓦屑坝（古移民集散地）', '116.67000000', '29.00000000', 'settlement', '江西省-上饶市', '25', null, '2026-01-18 14:59:45', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('68', '蕲春', '湖北省黄冈市蕲春县', '115.43000000', '30.24000000', 'settlement', '湖北省-黄冈市', '25', null, '2026-01-18 14:59:45', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('69', '莆田珠玑巷', '福建省莆田市（古珠玑巷）', '119.01000000', '25.43000000', 'settlement', '福建省-莆田市', '20', null, '2026-01-18 15:04:06', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('70', '化州岭边村', '广东省茂名市化州市岭边村（古）', '110.58000000', '21.66000000', 'settlement', '广东省-茂名市', '15', null, '2026-01-18 15:04:06', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('71', '韶州乳源', '广东省韶关市乳源瑶族自治县', '113.28000000', '24.78000000', 'settlement', '广东省-韶关市', '15', null, '2026-01-18 15:04:06', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('72', '韶州英德', '广东省清远市英德市', '113.40000000', '24.17000000', 'settlement', '广东省-清远市', '12', null, '2026-01-18 15:04:06', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('73', '临江府清江鹅公坵', '江西省宜春市樟树市（古清江县鹅公坵）', '115.54600000', '28.05600000', 'settlement', '江西省-宜春市', '20', null, '2026-01-18 15:04:06', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('74', '广州', '广东省广州市', '113.26000000', '23.13000000', 'settlement', '广东省-广州市', '25', null, '2026-01-18 15:04:06', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('75', '廉州府钦州', '广西壮族自治区钦州市（古廉州府）', '108.62400000', '21.96700000', 'settlement', '广西壮族自治区-钦州市', '12', null, '2026-01-18 15:04:06', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('76', '镇番', '甘肃省武威市民勤县', '103.09000000', '38.62000000', 'settlement', '甘肃省-武威市', '20', null, '2026-01-18 15:09:41', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('77', '洪洞大槐树', '山西省临汾市洪洞县（古大槐树）', '111.67000000', '36.25000000', 'settlement', '山西省-临汾市', '30', null, '2026-01-18 15:12:51', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('78', '永寿姜家村', '陕西省咸阳市永寿县常宁镇姜家村', '108.14000000', '34.76000000', 'settlement', '陕西省-咸阳市', '35', null, '2026-01-18 15:12:51', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('79', '南京柳树湾', '江苏省南京市（明故宫附近，古柳树湾）', '118.80000000', '32.04000000', 'settlement', '江苏省-南京市', '35', null, '2026-01-18 15:12:51', '2026-03-18 12:21:53');
+INSERT INTO `locations` VALUES ('80', '曲靖陆良', '云南省曲靖市陆良县', '103.67000000', '25.03000000', 'settlement', '云南省-曲靖市', '15', null, '2026-01-18 15:12:51', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('81', '曲靖沾益', '云南省曲靖市沾益区', '103.82000000', '25.60000000', 'settlement', '云南省-曲靖市', '12', null, '2026-01-18 15:12:51', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('82', '昭通', '云南省昭通市', '103.72000000', '27.34000000', 'settlement', '云南省-昭通市', '20', null, '2026-01-18 15:12:51', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('83', '徽州府歙县', '安徽省黄山市歙县', '118.43300000', '29.86700000', 'settlement', '安徽省-黄山市-歙县', '30', null, '2026-01-18 16:43:40', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('84', '徽州府休宁', '安徽省黄山市休宁县', '118.18300000', '29.78300000', 'settlement', '安徽省-黄山市-休宁县', '28', null, '2026-01-18 16:43:40', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('85', '徽州府黟县', '安徽省黄山市黟县', '117.93300000', '29.93300000', 'settlement', '安徽省-黄山市-黟县', '25', null, '2026-01-18 16:43:40', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('86', '严州府建德', '浙江省杭州市建德市', '119.28300000', '29.48300000', 'settlement', '浙江省-杭州市-建德市', '20', null, '2026-01-18 16:43:40', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('87', '严州府淳安', '浙江省杭州市淳安县', '119.04200000', '29.60000000', 'settlement', '浙江省-杭州市-淳安县', '25', null, '2026-01-18 16:43:40', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('88', '严州府遂安', '浙江省杭州市淳安县西南（古遂安县）', '118.80000000', '29.40000000', 'settlement', '浙江省-杭州市-淳安县', '5', null, '2026-01-18 16:43:40', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('89', '徽州府歙县（新安江上游）', '安徽省黄山市歙县徽城镇', '118.43300000', '29.86700000', 'settlement', '安徽省-黄山市-歙县', '25', null, '2026-01-19 11:22:46', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('90', '徽州府休宁县（新安江源头）', '安徽省黄山市休宁县海阳镇', '118.18300000', '29.78300000', 'settlement', '安徽省-黄山市-休宁县', '22', null, '2026-01-19 11:22:46', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('91', '徽州府黟县（新安江支流）', '安徽省黄山市黟县碧阳镇', '117.93300000', '29.93300000', 'settlement', '安徽省-黄山市-黟县', '20', null, '2026-01-19 11:22:46', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('92', '严州府淳安县（新安江中游）', '浙江省杭州市淳安县千岛湖镇', '119.04200000', '29.60000000', 'settlement', '浙江省-杭州市-淳安县', '22', null, '2026-01-19 11:22:46', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('93', '严州府建德县（新安江下游）', '浙江省杭州市建德市新安江街道', '119.28300000', '29.48300000', 'settlement', '浙江省-杭州市-建德市', '18', null, '2026-01-19 11:22:46', '2026-03-18 12:21:54');
+INSERT INTO `locations` VALUES ('94', '严州府遂安县（新安江南岸）', '浙江省杭州市淳安县汾口镇（古遂安）', '118.50000000', '29.40000000', 'settlement', '浙江省-杭州市-淳安县', '4', null, '2026-01-19 11:22:46', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('95', '新安江深渡镇', '安徽省黄山市歙县深渡镇', '118.60000000', '29.85000000', 'node', '安徽省-黄山市-歙县', '8', null, '2026-01-19 11:22:46', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('96', '新安江街口镇', '安徽省黄山市歙县街口镇', '118.75000000', '29.70000000', 'node', '安徽省-黄山市-歙县', '6', null, '2026-01-19 11:22:46', '2026-03-18 12:21:55');
+INSERT INTO `locations` VALUES ('97', '新安江威坪镇', '浙江省杭州市淳安县威坪镇', '118.90000000', '29.65000000', 'node', '浙江省-杭州市-淳安县', '5', null, '2026-01-19 11:22:46', '2026-03-18 12:21:55');
+
+-- ----------------------------
+-- Table structure for migrations
+-- ----------------------------
+DROP TABLE IF EXISTS `migrations`;
+CREATE TABLE `migrations` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT '迁徙ID',
+  `branch_id` int NOT NULL COMMENT '分支ID',
+  `from_location_id` int NOT NULL COMMENT '迁出地ID',
+  `to_location_id` int NOT NULL COMMENT '迁入地ID',
+  `period` varchar(100) DEFAULT NULL COMMENT '迁徙年代',
+  `estimated_year` int DEFAULT NULL COMMENT '估算年份',
+  `reason` varchar(255) DEFAULT NULL COMMENT '迁徙原因',
+  `reason_detail` text COMMENT '原因详细描述',
+  `key_figure` varchar(255) DEFAULT NULL COMMENT '关键人物',
+  `description` text COMMENT '事件描述',
+  `route_points` json DEFAULT NULL COMMENT '途经点JSON数组',
+  `distance_km` decimal(10,2) DEFAULT NULL COMMENT '路线长度(公里)',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_branch` (`branch_id`),
+  KEY `idx_period` (`period`(50)),
+  KEY `idx_year` (`estimated_year`),
+  KEY `fk_migration_from` (`from_location_id`),
+  KEY `fk_migration_to` (`to_location_id`),
+  CONSTRAINT `fk_migration_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_migration_from` FOREIGN KEY (`from_location_id`) REFERENCES `locations` (`id`),
+  CONSTRAINT `fk_migration_to` FOREIGN KEY (`to_location_id`) REFERENCES `locations` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='迁徙事件表';
+
+-- ----------------------------
+-- Records of migrations
+-- ----------------------------
+INSERT INTO `migrations` VALUES ('1', '1', '1', '2', '西周初年 (约公元前1046年)', '-1046', '封国', null, '姜子牙 (吕尚)', '姜姓发展史上的决定性事件。姜子牙因功被周武王封于齐，建都营丘。此举使姜姓的政治与文化中心从姜水流域转移到齐地。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('2', '2', '3', '4', '三国时期（约公元228年）', '228', '仕宦', null, '姜维', '姜维原为天水郡参军，后归附蜀汉诸葛亮，成为大将军。此路径是姜姓从天水向蜀地扩散的代表性事件，途径汉中。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('3', '2', '3', '5', '宋代', '960', '战乱南迁', null, '不详', '唐宋时期，北方士族多次南迁。部分天水姜氏后裔经江西等地辗转迁入浙江兰溪。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('4', '3', '6', '7', '明代中后期', '1550', '生计开发', null, '姜泰盂', '据族谱记载，志模公之子姜泰盂从江西瑞昌迁往湖北阳新，开垦定居，成为当地支祖。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('5', '3', '7', '8', '清初', '1650', '拓业迁居', null, '不详', '阳新的姜氏后裔在清初继续向湖南平江等地迁移，拓展产业。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('6', '4', '9', '10', '五代后唐同光二年（公元924年）', '924', '避乱择地', null, '姜德厚（字流光）', '始祖姜德厚于五代后唐同光二年，携家从江西吉州泰和迁至湖南宁乡黄材，卜居姜坊。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('7', '5', '11', '12', '清乾隆年间（约公元1760年代）', '1765', '渡海垦殖', null, '姜朝凤', '姜朝凤携子自广东原乡渡海来台，最初于盐水港登陆，后其孙姜秀峦入垦北埔，成为开拓首领。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('8', '12', '24', '25', '元代', '1300', '避乱', null, '姜发隆', '始迁祖姜发隆于元代为避战乱，从江西抚州崇仁县迁至湖南新化县，为该支开基祖。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('9', '13', '15', '26', '宋代以后', '1250', '官迁', null, '姜顺三', '宗祖姜顺三原籍江西袁州萍乡县，后官迁至湖北武昌县，家族于此定居发展。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('10', '14', '27', '28', '清代', '1750', '闯关东移民', null, '姜可任', '清代，第四世祖姜可任携家族从山东登州府黄县迁至辽宁奉天府庄河厅，属典型的\"闯关东\"移民。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('11', '15', '29', '30', '明代以前', '1400', '同府迁居', null, '不详', '该支姜氏较早从衢州府内开化县迁至江山县定居，属区域性扩散。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('12', '16', '31', '32', '明洪武二年', '1369', '政府组织移民', null, '姜佐', '明初洪武年间，为充实因战乱人口锐减的山东东部，政府组织大规模移民。姜氏始祖从高密西迁至渤海西岸的沾化县定居。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('13', '17', '33', '34', '北宋靖康年间', '1127', '避战乱', null, '不详', '北宋末年\"靖康之变\"期间，为躲避北方战祸，姜姓一族从东牟宁海彤岭南迁至昌邑县北部。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('14', '17', '35', '34', '元代中叶', '1300', '寻求新的发展地', null, '不详', '元代中期，另一支姜姓从黄城阳迁入昌邑县北部，与宋时迁入的同宗汇合，共同昌盛。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('15', '19', '37', '12', '清乾隆年间', '1765', '渡海垦殖', null, '姜世良十一世孙', '福建漳州姜氏在明清之际向台湾迁徙的代表性路线。始祖姜世良在闽发迹，其后裔于乾隆年间渡海赴台开垦。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('16', '19', '37', '38', '清乾隆初年', '1740', '渡海谋生', null, '姜士贞', '姜士贞于乾隆初年迁至澎湖岐头社，是姜姓在澎湖地区早期开发的例证。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('17', '1', '39', '40', '明洪武三年', '1370', '奉诏迁徙', null, '伯六', '明初洪武大移民的典型案例。始迁祖伯六奉朝廷诏令，从江南姑苏北迁至山东郯城。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('18', '1', '41', '42', '明洪武初年', '1370', '移民屯垦', null, '姜永贵', '明初洪武年间，姜永贵从江苏句容迁至安徽合肥东乡浮槎山一带定居。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('19', '21', '41', '43', '北宋时期', '1100', '择地定居', null, '伯六（姜伯六）', '北宋时期，姜氏先祖伯六从句容北迁至泰州三水地区，其后此地因姜姓聚居而得名\"姜堰\"。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('20', '3', '6', '14', '明代中后期', '1550', '生计开发', null, '姜泰盂', '志模公后裔从江西瑞昌向湖北东南部扩散的重要一支，姜泰盂迁至通山。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('21', '22', '44', '45', '唐代以后', '1000', '区域性扩散', null, '不详', '此支姜氏从浙南的丽水地区向浙西的新安江流域迁移，反映了古代浙江内部的人口流动。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('22', '23', '46', '47', '清乾隆末年', '1795', '渡海垦殖', null, '姜仕俊', '广东嘉应州客家人姜仕俊在乾隆末年率族人来台，开垦彰化地区，是客家姜姓迁台的典型代表。', null, null, '2026-01-17 21:53:47', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('23', '24', '89', '92', '宋元时期以来', '1200', '区域开发与宗族繁衍', null, '大民公', '该支姜氏以\"孝子大民公\"为核心，自宋元时期起从徽州府歙县沿新安江向严州府淳安县迁徙。', null, null, '2026-01-18 11:57:52', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('24', '26', '50', '51', '明弘治年间', '1500', '友邀择居', null, '罗菴公', '始祖罗菴公因拜访居住于沙村的吕姓友人，见当地风光幽美，遂从瑞安五都东溪迁居永强沙村。', null, null, '2026-01-18 12:00:29', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('25', '1', '2', '49', '南宋初年', '1150', '择地而居', null, '不详', '姜太公后裔的一支，从山东营水迁出，最晚在南宋初年已迁至山东乳山老黄山南坡定居。', null, null, '2026-01-18 12:13:36', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('26', '27', '52', '53', '明初', '1368', '奉朝廷之命迁徙', null, '二公', '明初，始祖二公奉命由青州府朱柳村迁至莱州府胶水县署前定居，后世称为\"衙门口姜氏\"。', null, null, '2026-01-18 14:54:16', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('27', '28', '54', '55', '晋代', '350', '官迁谪居', null, '姜朝泰', '晋代，一世祖姜朝泰原籍江苏润州宁海，官至大理寺正卿，后谪降至江西饶州鄱阳。', null, null, '2026-01-18 14:54:16', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('28', '29', '27', '56', '汉代至唐代', '200', '渡海迁徙、政治流动', null, '己其公族后裔', '此支系为商周时期山东古国\"己其\"的姜姓公族后裔。自汉代起，部分族人由山东胶东地区渡海迁往朝鲜半岛。', null, null, '2026-01-18 14:54:16', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('29', '30', '57', '58', '北宋时期', '1050', '同邑迁居，开拓产业', null, '姜仁普、姜仁和', '北宋时，姜仁普、姜仁和兄弟从慈溪横山迁至附近的湖山、大山一带，肇基创业。', null, null, '2026-01-18 14:59:45', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('30', '31', '59', '60', '元至正年间', '1350', '响应朝廷号召移民垦荒', null, '姜福五郎', '元末明初\"江西填湖广\"移民潮中，始祖姜福五郎从江西泰和鹅颈大丘迁至湖南邵阳县东乡开基。', null, null, '2026-01-18 14:59:45', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('31', '32', '61', '62', '清康熙年间', '1690', '奉旨移民填川', null, '姜仕凤', '清初\"湖广填四川\"运动中，姜仕凤率家族从湖南永州零陵长途跋涉入川，落业于富顺县下北乡。', null, null, '2026-01-18 14:59:45', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('32', '33', '63', '64', '明洪武年间', '1375', '政府强制移民', null, '姜仁三', '明初\"洪武赶散\"时期，姜仁三自苏州闾门被迁至泰兴东乡，后裔在泰兴、如皋等地繁盛。', null, null, '2026-01-18 14:59:45', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('33', '34', '65', '66', '明末清初', '1640', '谋生、寻找新的耕地', null, '姜世杰、姜世豪', '明末清初，姜世杰、姜世豪兄弟为寻求更好的生存环境，从湖南靖州远口西迁至贵州天柱渡马乡。', null, null, '2026-01-18 14:59:46', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('34', '35', '67', '68', '明洪武年间', '1380', '政府组织移民', null, '姜受一', '明初，姜受一自著名的移民集散地——江西饶州瓦屑坝，迁至湖北蕲州（今蕲春）定居。', null, null, '2026-01-18 14:59:46', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('35', '36', '69', '70', '宋末元初', '1270', '避乱南迁', null, '姜万一郎', '宋末元初社会动荡，姜万一郎自福建莆田珠玑巷南迁至广东高州府化州县岭边村。', null, null, '2026-01-18 15:04:06', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('36', '37', '71', '72', '明代', '1500', '同府迁居，拓展生计', null, '姜天富', '明代，姜天富从韶州府内的乳源县迁至英德县定居，属于区域性的人口流动。', null, null, '2026-01-18 15:04:06', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('37', '40', '5', '76', '明洪武十七年', '1384', '政府组织移民', null, '姜庆一、姜庆二', '明代初年，为充实边防、开发西北，姜庆一、姜庆二兄弟自江南金华府迁至甘肃镇番卫定居。', null, null, '2026-01-18 15:09:41', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('38', '41', '77', '78', '明末清初', '1645', '避乱迁徙', null, '姜懋德', '明末清初，因战乱与灾害，姜懋德带领家人从山西洪洞大槐树下，西迁至陕西永寿县。', null, null, '2026-01-18 15:12:51', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('39', '42', '79', '80', '明洪武年间', '1385', '军事征调，屯戍落户', null, '姜润（及姜汇）', '明洪武十四年，姜润、姜汇兄弟随傅友德、沐英大军征讨云南。平定后，以军功受封，屯戍于曲靖府。', null, null, '2026-01-18 15:12:51', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('40', '42', '80', '82', '清初（雍正年间）', '1730', '仕宦镇守', null, '姜正荣', '清初，一世祖姜正荣由曲靖陆良奉命镇守昭通，此后家族在昭通繁衍生息，成为地方盛族。', null, null, '2026-01-18 15:12:51', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('41', '29', '90', '93', '明代', '1500', '沿江拓展生计', null, '姜氏族人', '明代时期，部分姜氏族人从休宁县顺流而下，迁徙至建德县开拓新的居住地。', null, null, '2026-01-19 11:22:46', '2026-03-17 23:09:00');
+INSERT INTO `migrations` VALUES ('42', '29', '92', '94', '清代', '1700', '家族分迁', null, '姜氏分支', '清代，淳安县的姜氏家族部分成员向南岸的遂安县分迁，拓展家族聚居范围。', null, null, '2026-01-19 11:22:46', '2026-03-17 23:09:00');
+
+-- ----------------------------
+-- Table structure for password_reset_requests
+-- ----------------------------
+DROP TABLE IF EXISTS `password_reset_requests`;
+CREATE TABLE `password_reset_requests` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT '请求ID',
+  `user_id` int NOT NULL COMMENT '用户ID',
+  `reason` text COMMENT '重置原因',
+  `status` enum('pending','approved','rejected') DEFAULT 'pending' COMMENT '处理状态',
+  `reviewer_id` int DEFAULT NULL COMMENT '处理管理员ID',
+  `review_comment` text COMMENT '处理意见',
+  `new_password` varchar(255) DEFAULT NULL COMMENT '新密码（加密）',
+  `requested_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '请求时间',
+  `reviewed_at` datetime DEFAULT NULL COMMENT '处理时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_reviewer_id` (`reviewer_id`),
+  CONSTRAINT `fk_password_reset_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_password_reset_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='密码重置请求表';
+
+-- ----------------------------
+-- Records of password_reset_requests
+-- ----------------------------
+
+-- ----------------------------
+-- Table structure for submissions
+-- ----------------------------
+DROP TABLE IF EXISTS `submissions`;
+CREATE TABLE `submissions` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT '提交ID',
+  `user_id` int NOT NULL COMMENT '用户ID',
+  `type` enum('migration','family_tree') NOT NULL COMMENT '提交类型',
+  `branch_name` varchar(255) NOT NULL COMMENT '分支名称',
+  `surname` varchar(50) DEFAULT '姜' COMMENT '姓氏',
+  `content` text NOT NULL COMMENT '主要内容',
+  `ancestral_home` varchar(255) DEFAULT NULL COMMENT '祖源地',
+  `first_ancestor` varchar(255) DEFAULT NULL COMMENT '始祖信息',
+  `period` varchar(100) DEFAULT NULL COMMENT '年代',
+  `estimated_year` int DEFAULT NULL COMMENT '估算年份',
+  `from_location` varchar(255) DEFAULT NULL COMMENT '迁出地',
+  `to_location` varchar(255) DEFAULT NULL COMMENT '迁入地',
+  `route_data` json DEFAULT NULL COMMENT '路线数据或世代信息JSON',
+  `reason` varchar(255) DEFAULT NULL COMMENT '迁徙原因',
+  `key_figures` text COMMENT '关键人物',
+  `source_reference` varchar(500) DEFAULT NULL COMMENT '资料来源',
+  `contact_info` varchar(255) DEFAULT NULL COMMENT '联系方式',
+  `attachments` json DEFAULT NULL COMMENT '附件列表JSON',
+  `status` enum('pending','approved','rejected') DEFAULT 'pending' COMMENT '审核状态',
+  `reviewer_id` int DEFAULT NULL COMMENT '审核员ID',
+  `review_comment` text COMMENT '审核意见',
+  `submitted_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
+  `reviewed_at` datetime DEFAULT NULL COMMENT '审核时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_submitted_at` (`submitted_at`),
+  KEY `idx_reviewer_id` (`reviewer_id`),
+  CONSTRAINT `fk_submission_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_submission_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户提交表';
+
+-- ----------------------------
+-- Records of submissions
+-- ----------------------------
+INSERT INTO `submissions` VALUES ('1', '2', 'migration', 'test', '姜', 'TestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTestTest', null, null, 'test', '5', null, null, '\"testtesttesttesttest\"', '战乱迁徙', 'testtest', 'testtesttest', null, null, 'rejected', null, 'test', '2026-03-10 19:55:30', '2026-03-17 12:14:13');
+
+-- ----------------------------
+-- Table structure for system_meta
+-- ----------------------------
+DROP TABLE IF EXISTS `system_meta`;
+CREATE TABLE `system_meta` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `type` enum('config','log','backup') NOT NULL COMMENT '元数据类型',
+  `key` varchar(100) NOT NULL COMMENT '键名',
+  `value` json DEFAULT NULL COMMENT 'JSON值',
+  `content` text COMMENT '文本内容',
+  `user_id` int DEFAULT NULL COMMENT '操作用户ID',
+  `ip_address` varchar(50) DEFAULT NULL COMMENT 'IP地址',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_type_key` (`type`,`key`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_system_meta_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统元数据表';
+
+-- ----------------------------
+-- Records of system_meta
+-- ----------------------------
+
+-- ----------------------------
+-- Table structure for users
+-- ----------------------------
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE `users` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+  `username` varchar(50) NOT NULL COMMENT '用户名',
+  `password_hash` varchar(255) NOT NULL COMMENT '密码哈希',
+  `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
+  `role` enum('user','admin') DEFAULT 'user' COMMENT '角色',
+  `real_name` varchar(50) DEFAULT NULL COMMENT '真实姓名',
+  `phone` varchar(20) DEFAULT NULL COMMENT '联系电话',
+  `avatar_url` varchar(500) DEFAULT NULL COMMENT '头像URL',
+  `is_active` tinyint(1) DEFAULT '1' COMMENT '是否激活',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `last_login` datetime DEFAULT NULL COMMENT '最后登录时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_username` (`username`),
+  KEY `idx_username` (`username`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户表';
+
+-- ----------------------------
+-- Records of users
+-- ----------------------------
+INSERT INTO `users` VALUES ('1', 'admin', 'scrypt:32768:8:1$W9j7OXqfdjWM2QrK$d8d24b0aa5b70d61e4f64eb25dba94a75a83e0ab34956d7680fc293744eb1cb6418be4386f3e6107c9ab562d3cb1b027243f8489179a550771e4f53bac198901', null, 'admin', '系统管理员', null, null, '1', '2025-12-27 18:15:33', '2026-04-25 21:51:50', '2026-04-25 21:51:50');
+INSERT INTO `users` VALUES ('2', 'user', 'scrypt:32768:8:1$rD9Unmq7gQJdyRdO$b6a10ebdf965ec3539db4be4c3f6876d3096da26eea53e35cb97c792a9376b7cd2e44463bfc7c77bda768217b4615d9a5637abf3b1bb1c62a607ca7dd15aa893', null, 'user', '普通用户', null, null, '1', '2025-12-27 18:15:33', '2026-04-24 09:09:36', '2026-04-24 09:09:36');
+INSERT INTO `users` VALUES ('3', 'test', 'scrypt:32768:8:1$8iO7f1tzQ6EZrPoN$876c27e429662a5d863fb2b54dc3a0bfb907de9aa09dee4efec010e377d9d773db3c1ff059aa96ff0d3f5d68fcc6e3a7c4587afd71ae4a46401eb2ddce97f0e9', null, 'user', null, '12345678', null, '1', '2025-12-27 18:28:47', '2026-03-17 23:09:00', '2025-12-27 18:28:51');
+INSERT INTO `users` VALUES ('4', 'Sunhao', 'scrypt:32768:8:1$22y2j2m0jQrh5IVs$691a3a655d213cc5b1b4004be2437e2aa13f2ce65f470eb4848c8e1615ceeeb19d1965e4c8278a22509909d26ba9a4726c97abe559bfbcacc1bcd9207b46fd30', null, 'user', '孙浩', '', null, '1', '2026-01-17 22:48:05', '2026-03-17 23:09:00', null);
+
+-- ----------------------------
+-- Table structure for user_favorites
+-- ----------------------------
+DROP TABLE IF EXISTS `user_favorites`;
+CREATE TABLE `user_favorites` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `user_id` int NOT NULL COMMENT '用户ID',
+  `branch_id` int NOT NULL COMMENT '分支ID',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_branch` (`user_id`,`branch_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_branch_id` (`branch_id`),
+  CONSTRAINT `fk_favorite_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_favorite_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户收藏表';
+
+-- ----------------------------
+-- Records of user_favorites
+-- ----------------------------
+INSERT INTO `user_favorites` VALUES ('1', '2', '1', '2026-03-18 11:40:29');
+INSERT INTO `user_favorites` VALUES ('2', '2', '2', '2026-03-18 12:22:27');
+INSERT INTO `user_favorites` VALUES ('3', '1', '40', '2026-03-18 12:41:13');
+INSERT INTO `user_favorites` VALUES ('5', '1', '29', '2026-03-20 21:41:19');
+INSERT INTO `user_favorites` VALUES ('6', '1', '14', '2026-03-20 21:41:24');
+INSERT INTO `user_favorites` VALUES ('7', '1', '42', '2026-04-24 09:27:45');
+SET FOREIGN_KEY_CHECKS=1;

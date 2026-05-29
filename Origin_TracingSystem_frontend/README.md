@@ -52,7 +52,7 @@ src/
 
 ### 高德地图配置
 
-在 `src/config/index.js` 中配置高德地图的密钥和版本：
+在 `src/config/index.js` 中配置高德地图的密钥和版本，或通过环境变量 `VITE_AMAP_KEY` 设置：
 
 ```javascript
 amap: {

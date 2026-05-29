@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
+    "@wangeditor/editor": "^5.1.23",
+    "@wangeditor/editor-for-vue": "^5.1.12",
     "axios": "^1.13.2",
     "echarts": "^5.5.1",
     "element-plus": "^2.12.0",

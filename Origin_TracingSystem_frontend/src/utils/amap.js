@@ -554,32 +554,63 @@ const addOverlaySafely = (map, overlayName, overlayConstructor, options = {}) =>
  */
 export function createRasterLayer(AMap, options = {}) {
   const { type = 'tile', ...layerOptions } = options;
-  
+
   try {
     if (type === 'tile') {
-      // 创建瓦片图层
-      const defaultTileOptions = {
-        tileUrl: options.tileUrl || '',
+      // 创建瓦片图层 - 高德地图 2.0 API
+      // 使用 getTileUrl 函数来动态生成瓦片 URL
+      const tileUrl = options.tileUrl || options.url || '';
+
+      if (!tileUrl) {
+        console.error('瓦片图层 URL 不能为空');
+        return null;
+      }
+
+      // 构建 getTileUrl 函数
+      const getTileUrl = options.getTileUrl || function(x, y, z) {
+        // 支持 {x} {y} {z} 占位符的 URL 模板
+        return tileUrl
+          .replace('{x}', x)
+          .replace('{y}', y)
+          .replace('{z}', z)
+          .replace('{X}', x)
+          .replace('{Y}', y)
+          .replace('{Z}', z);
+      };
+
+      const tileLayerOptions = {
         tileSize: options.tileSize || 256,
         zIndex: options.zIndex || 10,
-        opacity: options.opacity || 0.7,
+        opacity: options.opacity ?? 0.7,
         visible: options.visible !== false,
         zooms: options.zooms || [3, 18],
-        getTileUrl: options.getTileUrl || null
+        getTileUrl: getTileUrl
       };
-      
-      return new AMap.TileLayer({ ...defaultTileOptions, ...layerOptions });
+
+      console.log('创建瓦片图层，配置:', tileLayerOptions);
+      return new AMap.TileLayer(tileLayerOptions);
     } else if (type === 'image') {
       // 创建单张图片图层
-      const defaultImageOptions = {
-        bounds: options.bounds || null,
-        url: options.url || '',
+      if (!options.url) {
+        console.error('图片图层 URL 不能为空');
+        return null;
+      }
+
+      if (!options.bounds) {
+        console.error('图片图层需要设置 bounds（地理边界）');
+        return null;
+      }
+
+      const imageLayerOptions = {
+        bounds: options.bounds,
+        url: options.url,
         zIndex: options.zIndex || 10,
-        opacity: options.opacity || 0.7,
+        opacity: options.opacity ?? 0.7,
         visible: options.visible !== false
       };
-      
-      return new AMap.ImageLayer({ ...defaultImageOptions, ...layerOptions });
+
+      console.log('创建图片图层，配置:', imageLayerOptions);
+      return new AMap.ImageLayer(imageLayerOptions);
     }
   } catch (error) {
     console.error('创建栅格图层失败:', error);
@@ -597,52 +628,104 @@ export function createRasterLayer(AMap, options = {}) {
  */
 export function createHeatMap(AMap, map, data = [], options = {}) {
   try {
-    // 检查HeatMap插件是否可用
-    if (!AMap.HeatMap) {
+    console.log('=== createHeatMap 被调用 ===');
+    console.log('AMap 对象:', AMap ? '存在' : '不存在');
+    console.log('地图实例:', map ? '存在' : '不存在');
+    console.log('数据点数量:', data.length);
+    
+    // 检查HeatMap插件是否可用（尝试多种可能的名称）
+    let HeatMapClass = AMap.HeatMap || AMap.Heatmap;
+    if (!HeatMapClass) {
       console.error('HeatMap插件未加载');
       return null;
     }
+    console.log('HeatMap 插件已加载');
+    
+    // 计算数据的最大值用于归一化
+    const maxWeight = data.length > 0 ? Math.max(...data.map(item => item[2] || 1)) : 100;
+    console.log('最大权重值:', maxWeight);
+    
+    // 增强的颜色渐变方案 - 使用更鲜明的颜色，提高对比度
+    const enhancedGradient = options.gradient || {
+      0.0: 'rgba(0, 0, 255, 0.3)',      // 深蓝 - 低密度（带透明度）
+      0.1: 'rgba(0, 100, 255, 0.5)',    // 浅蓝
+      0.3: 'rgba(0, 200, 255, 0.7)',    // 青色
+      0.5: 'rgba(0, 255, 100, 0.8)',    // 绿色
+      0.7: 'rgba(255, 255, 0, 0.9)',    // 黄色
+      0.85: 'rgba(255, 150, 0, 0.95)',  // 橙色
+      1.0: 'rgba(255, 0, 0, 1.0)'       // 红色 - 高密度
+    };
     
     const defaultHeatMapOptions = {
-      radius: options.radius || 25,
-      opacity: options.opacity || 0.7, // 简化为单个透明度值，适应不同版本
-      gradient: options.gradient || {
-        0.5: 'blue',
-        0.65: 'rgb(117,211,248)',
-        0.7: 'rgb(0, 255, 0)',
-        0.9: '#ffea00',
-        1.0: 'red'
-      },
-      zIndex: options.zIndex || 30,
-      visible: options.visible !== false
+      radius: options.radius || 50,           // 默认半径增大到50
+      opacity: options.opacity || 0.95,       // 默认透明度提高到0.95
+      gradient: enhancedGradient,
+      zIndex: options.zIndex || 999,          // 确保在最上层
+      visible: options.visible !== false,
+      // 新增配置选项
+      maxOpacity: options.maxOpacity || 1.0,  // 最大透明度
+      minOpacity: options.minOpacity || 0.4,  // 最小透明度提高
+      blur: options.blur || 10                // 减小模糊度使边缘更清晰
     };
+    
+    console.log('热力图配置:', defaultHeatMapOptions);
     
     let heatMap;
     
     // 尝试使用标准方式创建热力图 - 直接将地图实例传递给构造函数
     try {
-      heatMap = new AMap.HeatMap(map, {
+      console.log('正在创建 HeatMap 实例...');
+      console.log('地图对象:', map);
+      console.log('地图类型:', typeof map);
+      
+      // 高德地图 HeatMap 构造函数参数：new AMap.HeatMap(map, opts)
+      heatMap = new HeatMapClass(map, {
         ...defaultHeatMapOptions,
         ...options
       });
+      
+      console.log('HeatMap 实例创建成功:', heatMap ? '是' : '否');
+      console.log('HeatMap 类型:', typeof heatMap);
+      console.log('HeatMap 方法:', Object.keys(heatMap || {}));
+      
+      // 检查是否正确关联到地图
+      if (heatMap && typeof heatMap.getMap === 'function') {
+        const attachedMap = heatMap.getMap();
+        console.log('HeatMap 是否关联到地图:', attachedMap ? '是' : '否');
+      }
     } catch (error) {
       console.error('创建热力图失败:', error);
+      console.error('错误详情:', error.message);
+      console.error('错误堆栈:', error.stack);
       return null;
     }
     
     // 如果有数据，尝试设置数据
     if (data.length > 0 && heatMap && typeof heatMap.setData === 'function') {
       try {
+        console.log('正在设置热力图数据...');
         // 高德地图HeatMap.setData需要一个包含data属性的对象
+        // 降低 max 值使颜色更容易达到红色（高密度）
+        const maxDataValue = Math.max(5, Math.ceil(maxWeight * 0.5));
+        console.log('数据最大值设置为:', maxDataValue, '实际最大权重:', maxWeight);
+        
         heatMap.setData({
           data: data,
-          max: 5 // 设置数据最大值
+          max: maxDataValue
         });
+        console.log('热力图数据设置成功');
+        
+        // 强制显示热力图
+        if (typeof heatMap.show === 'function') {
+          heatMap.show();
+          console.log('热力图已强制显示');
+        }
       } catch (error) {
         console.error('设置热力图数据失败:', error);
       }
     }
     
+    console.log('=== createHeatMap 完成 ===');
     return heatMap;
   } catch (error) {
     console.error('创建热力图失败:', error);
